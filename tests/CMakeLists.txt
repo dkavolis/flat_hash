@@ -17,7 +17,6 @@ if(FLAT_HASH_ENABLE_CODE_COVERAGE)
   target_compile_options(flat_hash_tests PUBLIC -O0 -g -fno-inline -fno-inline-small-functions -fno-default-inline
                                                 --coverage)
 
-  set(GCOVR_ADDITIONAL_ARGS -v)
   setup_target_for_coverage_gcovr_html(
     NAME
     flat_hash_coverage_html
