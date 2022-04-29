@@ -101,7 +101,7 @@ cpmaddpackage(
   # set to yes skip cmake formatting
   "FORMAT_SKIP_CMAKE NO"
   # path to exclude (optional, supports regular expressions)
-  "CMAKE_FORMAT_EXCLUDE cmake/CPM.cmake|portfile.cmake")
+  "CMAKE_FORMAT_EXCLUDE cmake/CPM.cmake|portfile.cmake|CodeCoverage.cmake")
 
 if(FLAT_HASH_ENABLE_DOXYGEN)
   set(DOXYGEN_CALLER_GRAPH YES)
