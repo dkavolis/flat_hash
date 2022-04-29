@@ -116,7 +116,10 @@
         },
         {
             "name": "ci-codecov",
-            "configurePreset": "ci-codecov"
+            "configurePreset": "ci-codecov",
+            "targets": [
+                "flat_hash_coverage_xml"
+            ]
         }
     ],
     "testPresets": [
