@@ -25,7 +25,7 @@ if(FLAT_HASH_ENABLE_CODE_COVERAGE)
 
     message(STATUS "using gcov = ${GCOV}")
     execute_process(COMMAND ${GCOV} --version)
-    set(GCOVR_ADDITIONAL_ARGS --gcov-executable="${gcov}")
+    set(GCOVR_ADDITIONAL_ARGS --gcov-executable="${GCOV}")
     setup_target_for_coverage_gcovr_html(
       NAME
       flat_hash_coverage_html
