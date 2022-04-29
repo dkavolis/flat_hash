@@ -357,8 +357,8 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Set lookup tests", "[set][lookup]", std::string
 }
 
 FLAT_HASH_DYNAMIC_SET_TEST_CASE("Set tests for contains", "[set][contains]", int) {
-  std::initializer_list init = {0, 1, 2, 3};
-  std::initializer_list extra = {4, 5, 6};
+  std::initializer_list<int> init = {0, 1, 2, 3};
+  std::initializer_list<int> extra = {4, 5, 6};
   TestType s = init;
 
   CHECK_THAT(s, ContainsAllOf(init) && ContainsNoneOf(extra));
@@ -368,7 +368,7 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Set tests for contains using heterogeneous look
                                 std::string) {
   using namespace std::literals;
   std::initializer_list<std::string> init = {"first", "second", "third"};
-  std::initializer_list extra = {"fourth"sv, "fifth"sv, "sixth"sv};
+  std::initializer_list<std::string_view> extra = {"fourth"sv, "fifth"sv, "sixth"sv};
   TestType s = init;
 
   CHECK_THAT(s, ContainsAllOf(init | std::views::transform([](auto& str) -> std::string_view { return str; })) &&
