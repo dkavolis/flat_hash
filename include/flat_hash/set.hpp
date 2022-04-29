@@ -275,7 +275,8 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     hash_table_(bucket_count, std::move(init.policy), init.index_allocator),
     keys_(detail::containers::make_container<key_container>(0, init.key_allocator)) {
     if constexpr (detail::containers::reservable<key_container>) {
-      detail::containers::reserve(keys_, static_cast<size_type>(max_load_factor() * this->bucket_count()));
+      detail::containers::reserve(
+          keys_, static_cast<size_type>(max_load_factor() * static_cast<double>(this->bucket_count())));
     }
     FLAT_HASH_ASSERT(empty(), "set is not empty: {}", detail::maybe_format_arg(*this));
   }
@@ -783,8 +784,9 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
         erase(*first);
       } else {
         // TODO: for low numbers of elements to erase erase them one by one?
-        detail::containers::policy_erase<ordering>(keys_, first, last);
-        rehash();
+        auto beg = std::ranges::cbegin(keys_);
+        detail::containers::policy_erase<ordering>(keys_, beg + offset, beg + (last - cbegin()));
+        rehash(0);
       }
     }
 
@@ -995,7 +997,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * @return size_type
    */
   [[nodiscard]] constexpr auto max_bucket_count() const noexcept -> size_type {
-    return 2 << (sizeof(hash_type) * CHAR_BIT);
+    return static_cast<size_type>(std::numeric_limits<hash_type>::max());
   }
 
   /**
@@ -1157,7 +1159,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
   [[nodiscard]] constexpr operator std::span<Key const>() const noexcept
     requires std::ranges::contiguous_range<key_container>
   {
-    return span<Key const>(data(), size());
+    return std::span<Key const>(data(), size());
   }
 
   /**
@@ -1168,7 +1170,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
   [[nodiscard]] constexpr operator std::span<Key const, detail::static_size_v<key_container>>() const noexcept
     requires(std::ranges::contiguous_range<key_container> && detail::static_sized<key_container>)
   {
-    return span<Key const, detail::static_size_v<key_container>>(data(), size());
+    return std::span<Key const, detail::static_size_v<key_container>>(data(), size());
   }
 
   // Non-member functions
