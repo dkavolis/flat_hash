@@ -2,17 +2,17 @@
 flat_hash
 ===============
 
-.. image:: https://github.com/dkavolis/flat_hash/actions/workflows/windows.yml/badge.svg
-        :target: https://github.com/dkavolis/flat_hash/actions/workflows/windows.yml/badge.svg
-        :alt: Github Workflow Windows Build flat_hash Status
+.. image:: https://github.com/dkavolis/flat_hash/actions/workflows/msvc.yml/badge.svg
+        :target: https://github.com/dkavolis/flat_hash/actions/workflows/msvc.yml/badge.svg
+        :alt: Github Workflow MSVC Build flat_hash Status
 
-.. image:: https://github.com/dkavolis/flat_hash/actions/workflows/linux.yml/badge.svg
-        :target: https://github.com/dkavolis/flat_hash/actions/workflows/linux.yml/badge.svg
-        :alt: Github Workflow Linux Build flat_hash Status
+.. image:: https://github.com/dkavolis/flat_hash/actions/workflows/gcc.yml/badge.svg
+        :target: https://github.com/dkavolis/flat_hash/actions/workflows/gcc.yml/badge.svg
+        :alt: Github Workflow GCC Build flat_hash Status
 
-.. image:: https://github.com/dkavolis/flat_hash/actions/workflows/macos.yml/badge.svg
-        :target: https://github.com/dkavolis/flat_hash/actions/workflows/macos.yml/badge.svg
-        :alt: Github Workflow macOS Build flat_hash Status
+.. image:: https://github.com/dkavolis/flat_hash/actions/workflows/clang.yml/badge.svg
+        :target: https://github.com/dkavolis/flat_hash/actions/workflows/clang.yml/badge.svg
+        :alt: Github Workflow Clang Build flat_hash Status
 
 .. image:: https://readthedocs.org/projects/flat_hash/badge/?version=latest
         :target: https://flat_hash.readthedocs.io/en/latest/?badge=latest

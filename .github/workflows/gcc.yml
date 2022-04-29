@@ -1,0 +1,73 @@
+name: gcc
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - ".github/build/**"
+      - ".github/workflows/gcc.yml"
+      - ".github/ci-presets.json"
+      - "cmake/**"
+      - "include/**"
+      - "tests/**"
+      - "CMakeLists.txt"
+      - "vcpkg.json"
+      - "CMakePresets.json"
+  pull_request:
+    branches: [master]
+    paths:
+      - ".github/build/**"
+      - ".github/workflows/gcc.yml"
+      - ".github/ci-presets.json"
+      - "cmake/**"
+      - "include/**"
+      - "tests/**"
+      - "CMakeLists.txt"
+      - "vcpkg.json"
+      - "CMakePresets.json"
+
+env:
+  BUILD_TYPE: Release
+  INSTALL_LOCATION: ".local"
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    name: ${{ github.workflow }}-${{ matrix.preset }}
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]')"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # need <format> support
+          # - cxx: g++-11
+          #   install: sudo apt install g++-11
+          #   preset: ci-linux
+          - cxx: g++-11
+            install: sudo apt install g++-11
+            preset: ci-linux-fmt
+          - cxx: g++-11
+            install: sudo apt install g++-11
+            preset: ci-codecov
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+
+      - name: Find the number of threads (Linux)
+        run: echo "::set-output name=THREADS::`nproc`"
+        id: number-of-threads
+        shell: bash
+
+      - uses: ./.github/build
+        with:
+          cmakePreset: ${{ matrix.preset }}
+          cxx: ${{ matrix.cxx }}
+          install: ${{ matrix.install }}
+          cxxflags: ${{ matrix.cxxflags }}
+          threads: ${{ steps.number-of-threads.outputs.THREADS }}
+
+      - name: Code coverage using Codecov
+        run: bash <(curl -s https://codecov.io/bash)
+        if: "contains(${{ matrix.preset }}, 'codecov')"

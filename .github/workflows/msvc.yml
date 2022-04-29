@@ -1,16 +1,30 @@
-name: windows
+name: msvc
 
 on:
   push:
     branches: [master]
-    paths-ignore:
-      - "**/README.*"
-      - "**/CONTRIBUTING.*"
+    paths:
+      - ".github/build/**"
+      - ".github/workflows/msvc.yml"
+      - ".github/ci-presets.json"
+      - "cmake/**"
+      - "include/**"
+      - "tests/**"
+      - "CMakeLists.txt"
+      - "vcpkg.json"
+      - "CMakePresets.json"
   pull_request:
     branches: [master]
-    paths-ignore:
-      - "**/README.*"
-      - "**/CONTRIBUTING.*"
+    paths:
+      - ".github/build/**"
+      - ".github/workflows/msvc.yml"
+      - ".github/ci-presets.json"
+      - "cmake/**"
+      - "include/**"
+      - "tests/**"
+      - "CMakeLists.txt"
+      - "vcpkg.json"
+      - "CMakePresets.json"
 
 env:
   BUILD_TYPE: Release
