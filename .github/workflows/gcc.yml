@@ -47,7 +47,7 @@ jobs:
             install: sudo apt install g++-11
             preset: ci-linux-fmt
           - cxx: g++-11
-            install: sudo apt install g++-11
+            install: sudo apt install g++-11 gcovr
             preset: ci-codecov
 
     steps:
