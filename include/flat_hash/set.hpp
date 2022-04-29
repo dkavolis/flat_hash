@@ -526,9 +526,9 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    */
   [[nodiscard]] constexpr auto max_size() const noexcept -> size_type {
     auto [reserved_values, reserved_bits] = hash_table_.reserved();
-    constexpr std::uint8_t indexing_bytes = std::min(sizeof(hash_type), sizeof(index_type));
+    constexpr auto indexing_bytes = static_cast<std::uint8_t>(std::min(sizeof(hash_type), sizeof(index_type)));
 
-    return (1 << (indexing_bytes * CHAR_BIT - reserved_bits)) - reserved_values;
+    return (size_type{1} << (indexing_bytes * CHAR_BIT - reserved_bits)) - reserved_values;
   }
 
   // Modifiers
