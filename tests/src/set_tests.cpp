@@ -74,6 +74,8 @@ using array_set = flat_hash::fixed_set<int, 5>;
 using fixed_span_set = flat_hash::set_view<int, 5>;
 using tiny_set = flat_hash::inline_set<int, 5>;
 
+template class set<int>;
+
 TEST_CASE("Provided set traits satisfy concepts", "[traits][concepts][set]") {
   STATIC_REQUIRE(set_traits<dynamic_set_traits<int>>);
   STATIC_REQUIRE(set_traits_for<dynamic_set_traits<int>, int>);

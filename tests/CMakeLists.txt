@@ -11,8 +11,30 @@ set_project_warnings(flat_hash_tests PRIVATE true)
 
 if(FLAT_HASH_ENABLE_CODE_COVERAGE)
   message(STATUS "Code coverage enabled")
-  target_compile_options(flat_hash_tests PUBLIC -O0 -g -fprofile-arcs -ftest-coverage)
-  target_link_options(flat_hash_tests PUBLIC -fprofile-arcs -ftest-coverage)
+
+  include(${CMAKE_SOURCE_DIR}/cmake/CodeCoverage.cmake)
+  append_coverage_compiler_flags_to_target(flat_hash_tests)
+  target_compile_options(flat_hash_tests PUBLIC -O0 -g -fno-inline -fno-inline-small-functions -fno-default-inline
+                                                --coverage)
+  setup_target_for_coverage_gcovr_html(
+    NAME
+    flat_hash_coverage_html
+    EXECUTABLE
+    flat_hash_tests
+    DEPENDENCIES
+    flat_hash_tests
+    BASE_DIRECTORY
+    ${CMAKE_SOURCE_DIR}/include)
+  setup_target_for_coverage_gcovr_xml(
+    NAME
+    flat_hash_coverage_xml
+    EXECUTABLE
+    flat_hash_tests
+    DEPENDENCIES
+    flat_hash_tests
+    BASE_DIRECTORY
+    ${CMAKE_SOURCE_DIR}/include)
+  target_link_libraries(flat_hash_tests PUBLIC gcov)
 endif()
 
 find_package(Catch2 3 CONFIG REQUIRED)
