@@ -10,32 +10,42 @@ include(../cmake/CompilerWarnings.cmake)
 set_project_warnings(flat_hash_tests PRIVATE true)
 
 if(FLAT_HASH_ENABLE_CODE_COVERAGE)
-  message(STATUS "Code coverage enabled")
+  string(REPLACE "." ";" version ${CMAKE_CXX_COMPILER_VERSION})
+  list(GET version 0 gcc_major)
+  get_filename_component(PATH ${CMAKE_CXX_COMPILER} DIRECTORY)
+  find_program(GCOV NAMES gcov-${gcc_major} gcov HINTS ${path} PATHS ENV GCOV)
 
-  include(${CMAKE_SOURCE_DIR}/cmake/CodeCoverage.cmake)
-  append_coverage_compiler_flags_to_target(flat_hash_tests)
-  target_compile_options(flat_hash_tests PUBLIC -O0 -g -fno-inline -fno-inline-small-functions -fno-default-inline
-                                                --coverage)
+  if(GCOV)
+    message(STATUS "Code coverage enabled")
 
-  setup_target_for_coverage_gcovr_html(
-    NAME
-    flat_hash_coverage_html
-    EXECUTABLE
-    flat_hash_tests
-    DEPENDENCIES
-    flat_hash_tests
-    BASE_DIRECTORY
-    ${CMAKE_SOURCE_DIR}/include)
-  setup_target_for_coverage_gcovr_xml(
-    NAME
-    flat_hash_coverage_xml
-    EXECUTABLE
-    flat_hash_tests
-    DEPENDENCIES
-    flat_hash_tests
-    BASE_DIRECTORY
-    ${CMAKE_SOURCE_DIR}/include)
-  target_link_libraries(flat_hash_tests PUBLIC gcov)
+    include(${CMAKE_SOURCE_DIR}/cmake/CodeCoverage.cmake)
+    append_coverage_compiler_flags_to_target(flat_hash_tests)
+    target_compile_options(flat_hash_tests PUBLIC -O0 -g -fno-inline -fno-inline-small-functions -fno-default-inline
+                                                  --coverage)
+
+    message(STATUS "using gcov = ${GCOV}")
+    execute_process(COMMAND ${GCOV} --version)
+    set(GCOVR_ADDITIONAL_ARGS --gcov-executable="${gcov}")
+    setup_target_for_coverage_gcovr_html(
+      NAME
+      flat_hash_coverage_html
+      EXECUTABLE
+      flat_hash_tests
+      DEPENDENCIES
+      flat_hash_tests
+      BASE_DIRECTORY
+      ${CMAKE_SOURCE_DIR}/include)
+    setup_target_for_coverage_gcovr_xml(
+      NAME
+      flat_hash_coverage_xml
+      EXECUTABLE
+      flat_hash_tests
+      DEPENDENCIES
+      flat_hash_tests
+      BASE_DIRECTORY
+      ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(flat_hash_tests PUBLIC gcov)
+  endif()
 endif()
 
 find_package(Catch2 3 CONFIG REQUIRED)
