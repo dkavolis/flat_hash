@@ -34,7 +34,10 @@ jobs:
   build:
     runs-on: windows-2022
     name: ${{ github.workflow }}-${{ matrix.preset }}
-    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]')"
+    if: "!contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.head_commit.message, '[ci skip]')  &&
+      !contains(github.event.head_commit.message, '[skip msvc]')  &&
+      !contains(github.event.head_commit.message, '[msvc skip]')"
     strategy:
       fail-fast: false
       matrix:
