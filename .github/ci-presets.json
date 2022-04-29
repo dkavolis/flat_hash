@@ -74,7 +74,8 @@
         {
             "name": "ci-codecov",
             "inherits": [
-                "ci-linux-fmt"
+                "ci-linux-fmt",
+                "Debug"
             ],
             "cacheVariables": {
                 "FLAT_HASH_ENABLE_CODE_COVERAGE": true

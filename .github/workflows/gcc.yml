@@ -74,7 +74,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
           directory: ${{ github.workspace }}/out/build/${{ matrix.preset }}/tests
-          dry_run: true
+          dry_run: false
           env_vars: OS
           fail_ci_if_error: false
           files: flat_hash_coverage_xml.xml
