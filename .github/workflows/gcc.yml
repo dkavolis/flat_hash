@@ -72,7 +72,10 @@ jobs:
 
       - name: Display coverage file
         if: "${{ matrix.preset == 'ci-codecov' }}"
-        run: cat "${{ github.workspace }}/out/build/${{ matrix.preset }}/tests/flat_hash_coverage_xml.xml"
+        run: |
+          gcov --version
+          lcov --version
+          cat "${{ github.workspace }}/out/build/${{ matrix.preset }}/tests/flat_hash_coverage_xml.xml"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
