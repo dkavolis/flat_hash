@@ -1,0 +1,64 @@
+name: Build
+description: Build flat_hash tests
+
+inputs:
+  cmakePreset:
+    required: true
+    description: CMake preset name
+  cxx:
+    required: false
+    description: C++ compiler to use
+  install:
+    required: false
+    description: Environment setup command
+  cxxflags:
+    required: false
+    description: C++ compiler flags
+  vcpkgGitCommitId:
+    required: false
+    default: "423d9f01a7195a9fd13998500d57f532344eae38"
+    description: Full SHA-1 hash of vcpkg git commit
+  threads:
+    required: false
+    description: Number of threads to use for building
+    default: "2"
+
+runs:
+  using: composite
+  steps:
+    - uses: lukka/get-cmake@latest
+
+    - name: Restore artifacts, or setup vcpkg (do not install any package)
+      uses: lukka/run-vcpkg@v10
+      id: runvcpkg
+      env:
+        CMAKE_BUILD_PARALLEL_LEVEL: ${{ inputs.threads }}
+      with:
+        # This specifies the location of vcpkg, where it is going to be restored from cache, or create from scratch.
+        vcpkgDirectory: "${{ runner.workspace }}/b/vcpkg"
+        # The Git commit id of vcpkg to be checked out. This is only needed because we are not using a submodule.
+        vcpkgGitCommitId: "${{ inputs.vcpkgGitCommitId }}"
+        # The vcpkg.json file, which will be part of cache key computation.
+        vcpkgJsonGlob: "vcpkg.json"
+
+    - name: Prints output of run-vcpkg's action
+      run: echo "root='${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_ROOT_OUT }}', triplet='${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_DEFAULT_TRIPLET_OUT }}'"
+      shell: bash
+
+    - name: Setup CMake environment
+      run: |
+        cp "${{ github.workspace }}/.github/ci-presets.json" "${{ github.workspace }}/CMakeUserPresets.json"
+        ${{ inputs.install }}
+      shell: bash
+
+    - name: Run CMake with vcpkg.json manifest
+      uses: lukka/run-cmake@v10
+      env:
+        CXX: ${{ inputs.cxx }}
+        CXXFLAGS: ${{ inputs.cxxflags }}
+        CMAKE_BUILD_PARALLEL_LEVEL: ${{ inputs.threads }}
+      with:
+        cmakeListsTxtPath: "${{ github.workspace }}/CMakeLists.txt"
+        configurePreset: ${{ inputs.cmakePreset }}
+        buildPreset: ${{ inputs.cmakePreset }}
+        testPreset: ${{ inputs.cmakePreset }}

@@ -1,0 +1,90 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 1
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true
+      },
+      "warnings": {
+        "unusedCli": false
+      }
+    },
+    {
+      "name": "disable-vcpkg-manifest",
+      "hidden": true,
+      "cacheVariables": {
+        "VCPKG_MANIFEST_MODE": false
+      }
+    },
+    {
+      "name": "enable-assertions",
+      "hidden": true,
+      "cacheVariables": {
+        "FLAT_HASH_ENABLE_ASSERTIONS": true
+      }
+    },
+    {
+      "name": "enable-tests",
+      "hidden": true,
+      "inherits": [
+        "enable-assertions"
+      ],
+      "cacheVariables": {
+        "FLAT_HASH_BUILD_TESTS": true
+      }
+    },
+    {
+      "name": "use-fmtlib",
+      "hidden": true,
+      "cacheVariables": {
+        "FLAT_HASH_USE_FMTLIB": true
+      }
+    },
+    {
+      "name": "develop",
+      "hidden": true,
+      "inherits": [
+        "default",
+        "enable-tests"
+      ]
+    },
+    {
+      "name": "develop-fmt",
+      "hidden": true,
+      "inherits": [
+        "develop",
+        "use-fmtlib"
+      ]
+    },
+    {
+      "name": "RelWithDebInfo",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "Release",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "Debug",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ]
+}

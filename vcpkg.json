@@ -1,0 +1,26 @@
+{
+    "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+    "name": "flat-hash",
+    "version": "0.0.1",
+    "dependencies": [],
+    "features": {
+        "test": {
+            "description": "Build tests",
+            "dependencies": [
+                {
+                    "name": "catch2",
+                    "version>=": "3.0"
+                }
+            ]
+        },
+        "fmt": {
+            "description": "Use fmtlib for formatting",
+            "dependencies": [
+                {
+                    "name": "fmt",
+                    "version>=": "8.1.1#2"
+                }
+            ]
+        }
+    }
+}

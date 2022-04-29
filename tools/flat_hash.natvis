@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+    <Type Name="flat_hash::v0::detail::inline_vector&lt;*&gt;">
+        <DisplayString>{{size = {count_}}}</DisplayString>
+        <Expand>
+            <Item Name="[size]">count_</Item>
+            <Item Name="[capacity]">$T2</Item>
+            <ArrayItems>
+                <Size>count_</Size>
+                <ValuePointer>($T1*)storage_</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+
+    <Type Name="flat_hash::v0::detail::maybe_empty&lt;*&gt;">
+        <DisplayString Optional="true">{ value }</DisplayString>
+        <Expand>
+            <ExpandedItem Optional="true">value</ExpandedItem>
+        </Expand>
+    </Type>
+
+    <Type Name="flat_hash::v0::detail::hash_table&lt;*&gt;">
+        <DisplayString>{indices_}</DisplayString>
+        <Expand>
+            <Item Name="[policy]">policy_</Item>
+            <ExpandedItem>indices_</ExpandedItem>
+        </Expand>
+    </Type>
+
+    <Type Name="flat_hash::v0::set&lt;*&gt;">
+        <DisplayString>{keys_}</DisplayString>
+        <Expand>
+            <Item Name="[traits]">traits_</Item>
+            <Item Name="[hash]">hash_</Item>
+            <Item Name="[key_eq]">key_eq_</Item>
+            <Item Name="[hash_table]">hash_table_</Item>
+            <ExpandedItem>keys_</ExpandedItem>
+        </Expand>
+    </Type>
+</AutoVisualizer>
