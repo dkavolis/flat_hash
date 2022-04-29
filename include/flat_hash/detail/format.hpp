@@ -153,6 +153,13 @@ struct range_format_options {
   };
 }
 
+// std::format doesn't have on_error member like fmt does
+#ifdef FLAT_HASH_USE_FMTLIB
+#  define FLAT_HASH_ON_FORMAT_ERROR(ctx, ...) ctx.on_error(__VA_ARGS__)
+#else
+#  define FLAT_HASH_ON_FORMAT_ERROR(ctx, ...) throw std::format_error(__VA_ARGS__)
+#endif
+
 template <class... Args>
 [[nodiscard]] constexpr auto parse_range_format(FLAT_HASH_FORMAT_NS basic_format_parse_context<Args...>& ctx)
     -> std::pair<decltype(ctx.begin()), range_format_options> {
@@ -180,7 +187,7 @@ template <class... Args>
         break;
       }
       default: {
-        ctx.on_error("invalid format specifier!");
+        FLAT_HASH_ON_FORMAT_ERROR(ctx, "invalid format specifier!");
         break;
       }
     }

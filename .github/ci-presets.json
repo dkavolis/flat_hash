@@ -53,7 +53,7 @@
         {
             "name": "ci-msvc-fmt",
             "inherits": [
-                "ci-linux",
+                "ci-msvc",
                 "use-fmtlib"
             ]
         },

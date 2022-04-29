@@ -10,6 +10,7 @@ include(../cmake/CompilerWarnings.cmake)
 set_project_warnings(flat_hash_tests PRIVATE true)
 
 if(FLAT_HASH_ENABLE_CODE_COVERAGE)
+  message(STATUS "Code coverage enabled")
   target_compile_options(flat_hash_tests PUBLIC -O0 -g -fprofile-arcs -ftest-coverage)
   target_link_options(flat_hash_tests PUBLIC -fprofile-arcs -ftest-coverage)
 endif()

@@ -53,11 +53,24 @@ if(MSVC)
                                      $<INSTALL_INTERFACE:include/flat_hash/flat_hash.natvis>)
 endif()
 
-if(MSVC AND NOT FLAT_HASH_USE_FMTLIB)
+target_compile_features(flat_hash INTERFACE cxx_std_20)
+
+if(MSVC)
+  include(cmake/utils.cmake)
+  set(CMAKE_REQUIRED_FLAGS "/std:c++20")
+  check_cxx_feature_macro(__cpp_lib_ranges 202100 "ranges" HAVE_RANGES)
+  if(NOT FLAT_HASH_USE_FMTLIB)
+    check_cxx_feature_macro(__cpp_lib_format 202100 "format" HAVE_FORMAT)
+  else()
+    set(HAVE_FORMAT TRUE CACHE BOOL "")
+  endif()
+
   # See https://github.com/microsoft/STL/issues/1814
-  target_compile_features(flat_hash INTERFACE cxx_std_23)
+  if(NOT HAVE_RANGES OR NOT HAVE_FORMAT)
+    target_compile_features(flat_hash INTERFACE cxx_std_23)
+  endif()
 else()
-  target_compile_features(flat_hash INTERFACE cxx_std_20)
+
 endif()
 target_compile_definitions(flat_hash INTERFACE $<$<BOOL:${FLAT_HASH_ENABLE_ASSERTIONS}>:FLAT_HASH_ENABLE_ASSERTIONS>)
 
