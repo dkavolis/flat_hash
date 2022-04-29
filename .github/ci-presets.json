@@ -25,15 +25,15 @@
         {
             "name": "ci-linux-debug",
             "inherits": [
-                "ci-linux",
-                "Debug"
+                "Debug",
+                "ci-linux"
             ]
         },
         {
             "name": "ci-linux-fmt-debug",
             "inherits": [
-                "ci-linux-fmt",
-                "Debug"
+                "Debug",
+                "ci-linux-fmt"
             ]
         },
         {
@@ -60,22 +60,22 @@
         {
             "name": "ci-msvc-debug",
             "inherits": [
-                "ci-msvc",
-                "Debug"
+                "Debug",
+                "ci-msvc"
             ]
         },
         {
             "name": "ci-msvc-fmt-debug",
             "inherits": [
-                "ci-msvc-fmt",
-                "Debug"
+                "Debug",
+                "ci-msvc-fmt"
             ]
         },
         {
             "name": "ci-codecov",
             "inherits": [
-                "ci-linux-fmt",
-                "Debug"
+                "Debug",
+                "ci-linux-fmt"
             ],
             "cacheVariables": {
                 "FLAT_HASH_ENABLE_CODE_COVERAGE": true
