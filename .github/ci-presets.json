@@ -78,7 +78,8 @@
                 "ci-linux-fmt"
             ],
             "cacheVariables": {
-                "FLAT_HASH_ENABLE_CODE_COVERAGE": true
+                "FLAT_HASH_ENABLE_CODE_COVERAGE": true,
+                "CODE_COVERAGE_VERBOSE": true
             }
         }
     ],
