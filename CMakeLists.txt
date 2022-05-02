@@ -46,6 +46,16 @@ endif()
 
 target_compile_features(flat_hash_base INTERFACE cxx_std_20)
 
+if(MSVC)
+  include(cmake/utils.cmake)
+  set(CMAKE_REQUIRED_FLAGS "/std:c++20")
+  check_cxx_feature_macro(__cpp_lib_ranges 202100 "ranges" HAVE_RANGES)
+  # See https://github.com/microsoft/STL/issues/1814
+  if(NOT HAVE_RANGES)
+    target_compile_features(flat_hash_base INTERFACE cxx_std_23)
+  endif()
+endif()
+
 target_compile_definitions(flat_hash_base
                            INTERFACE $<$<BOOL:${FLAT_HASH_ENABLE_ASSERTIONS}>:FLAT_HASH_ENABLE_ASSERTIONS>)
 
@@ -60,17 +70,9 @@ add_library(flat_hash INTERFACE)
 target_link_libraries(flat_hash INTERFACE flat_hash_base)
 
 if(MSVC)
-  include(cmake/utils.cmake)
-  set(CMAKE_REQUIRED_FLAGS "/std:c++20")
-  check_cxx_feature_macro(__cpp_lib_ranges 202100 "ranges" HAVE_RANGES)
-  if(NOT FLAT_HASH_USE_FMTLIB)
-    check_cxx_feature_macro(__cpp_lib_format 202100 "format" HAVE_FORMAT)
-  else()
-    set(HAVE_FORMAT TRUE CACHE BOOL "")
-  endif()
-
+  check_cxx_feature_macro(__cpp_lib_format 202100 "format" HAVE_FORMAT)
   # See https://github.com/microsoft/STL/issues/1814
-  if(NOT HAVE_RANGES OR NOT HAVE_FORMAT)
+  if(NOT HAVE_FORMAT)
     target_compile_features(flat_hash INTERFACE cxx_std_23)
   endif()
 endif()
