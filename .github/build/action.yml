@@ -25,7 +25,7 @@ inputs:
     description: C++ compiler flags
   vcpkgGitCommitId:
     required: false
-    default: "423d9f01a7195a9fd13998500d57f532344eae38"
+    default: "2ece8fedb9e5065e7a21ffa7f110e2b6c2d95dab"
     description: Full SHA-1 hash of vcpkg git commit
   threads:
     required: false
@@ -38,7 +38,7 @@ runs:
     - uses: lukka/get-cmake@latest
 
     - name: Restore artifacts, or setup vcpkg (do not install any package)
-      uses: lukka/run-vcpkg@v10.2
+      uses: lukka/run-vcpkg@v10
       id: runvcpkg
       env:
         CMAKE_BUILD_PARALLEL_LEVEL: ${{ inputs.threads }}
