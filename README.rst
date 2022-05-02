@@ -1,5 +1,5 @@
 ===============
-flat_hash
+[WIP] flat_hash
 ===============
 
 .. image:: https://github.com/dkavolis/flat_hash/actions/workflows/msvc.yml/badge.svg
@@ -13,7 +13,7 @@ flat_hash
 .. image:: https://github.com/dkavolis/flat_hash/actions/workflows/clang.yml/badge.svg
         :target: https://github.com/dkavolis/flat_hash/actions/workflows/clang.yml/badge.svg
         :alt: Github Workflow Clang Build flat_hash Status
-        
+
 
 .. image:: https://codecov.io/gh/dkavolis/flat_hash/branch/master/graph/badge.svg?token=P425OBVMLW
         :target: https://codecov.io/gh/dkavolis/flat_hash
@@ -52,6 +52,22 @@ Features
 * Similar to LLVM ``StringMap``
 * Provides fully dynamic, small and static sets, all convertible to a provided view type
 * ``<format>`` and ``fmtlib`` support
+
+Usage
+-----
+
+The package provides CMake targets::
+
+    # Using with <format>:
+    find_package(flat_hash CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE flat_hash::flat_hash)
+
+    # Or using with fmtlib:
+    find_package(flat_hash CONFIG REQUIRED COMPONENTS fmt)
+    target_link_libraries(main PRIVATE flat_hash::flat_hash-fmt)
+
+    # Or use the header-only fmt version
+    target_link_libraries(main PRIVATE flat_hash::flat_hash-fmt-header-only)
 
 TODO
 ----
