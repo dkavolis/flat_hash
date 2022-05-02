@@ -48,9 +48,11 @@ jobs:
           #   preset: ci-linux
           - cxx: g++-11
             install: sudo apt install g++-11
+            configure: ci-linux
             preset: ci-linux-fmt
           - cxx: g++-11
             install: sudo apt install g++-11 gcovr
+            configure: ci-codecov
             preset: ci-codecov
 
     steps:
@@ -65,7 +67,9 @@ jobs:
 
       - uses: ./.github/build
         with:
-          cmakePreset: ${{ matrix.preset }}
+          configurePreset: ${{ matrix.configure }}
+          buildPreset: ${{ matrix.preset }}
+          testPreset: ${{ matrix.preset }}
           cxx: ${{ matrix.cxx }}
           install: ${{ matrix.install }}
           cxxflags: ${{ matrix.cxxflags }}

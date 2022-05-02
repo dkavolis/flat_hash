@@ -46,6 +46,7 @@ jobs:
           - install: sudo apt install clang-15 libc++-15-dev libc++abi-15-dev
             cxxflags: -stdlib=libc++
             cxx: clang++-15
+            configure: ci-linux
             preset: ci-linux-fmt
 
     steps:
@@ -60,7 +61,9 @@ jobs:
 
       - uses: ./.github/build
         with:
-          cmakePreset: ${{ matrix.preset }}
+          configurePreset: ${{ matrix.configure }}
+          buildPreset: ${{ matrix.preset }}
+          testPreset: ${{ matrix.preset }}
           cxx: ${{ matrix.cxx }}
           install: ${{ matrix.install }}
           cxxflags: ${{ matrix.cxxflags }}
