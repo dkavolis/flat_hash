@@ -72,3 +72,9 @@
 #else
 #  define FLAT_HASH_UNREACHABLE() __builtin_unreachable()
 #endif
+
+#ifndef FLAT_HASH_ENABLE_ASSERTIONS
+#  ifndef NDEBUG
+#    define FLAT_HASH_ENABLE_ASSERTIONS
+#  endif
+#endif
