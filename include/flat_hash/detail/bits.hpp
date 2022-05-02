@@ -180,7 +180,7 @@ FLAT_HASH_NAMESPACE_BEGIN
 
 template <class T, std::size_t N>
   requires(N != gsl::dynamic_extent)
-struct is_static_sized<gsl::span<T, N>> : std::true_type {
+struct detail::is_static_sized<gsl::span<T, N>> : std::true_type {
   constexpr static std::size_t size = N;
 };
 

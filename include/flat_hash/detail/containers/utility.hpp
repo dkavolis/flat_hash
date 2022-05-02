@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include <algorithm>  // for std::ranges::for_each
 #include <utility>
 
 #include "../macros.hpp"
