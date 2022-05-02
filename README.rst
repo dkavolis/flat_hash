@@ -56,7 +56,9 @@ Features
 Usage
 -----
 
-The package provides CMake targets::
+The package provides CMake targets
+
+.. code-block:: cmake
 
     # Using with <format>:
     find_package(flat_hash CONFIG REQUIRED)
