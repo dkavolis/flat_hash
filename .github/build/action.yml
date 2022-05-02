@@ -38,7 +38,7 @@ runs:
     - uses: lukka/get-cmake@latest
 
     - name: Restore artifacts, or setup vcpkg (do not install any package)
-      uses: lukka/run-vcpkg@v10
+      uses: lukka/run-vcpkg@v10.2
       id: runvcpkg
       env:
         CMAKE_BUILD_PARALLEL_LEVEL: ${{ inputs.threads }}
