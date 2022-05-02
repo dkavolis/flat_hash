@@ -51,7 +51,9 @@ jobs:
             configure: ci-linux
             preset: ci-linux-fmt
           - cxx: g++-11
-            install: sudo apt install g++-11 gcovr
+            install: |
+              sudo apt install g++-11
+              pip install git+https://github.com/gcovr/gcovr.git@ba4de0ea3b4c69aec2b745b7174411d6867828e8 --user
             configure: ci-codecov
             preset: ci-codecov
 

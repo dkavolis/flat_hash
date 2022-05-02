@@ -15,18 +15,29 @@ function(enable_coverage NAME_ TARGET)
   list(GET version 0 gcc_major)
   get_filename_component(PATH ${CMAKE_CXX_COMPILER} DIRECTORY)
   find_program(GCOV NAMES gcov-${gcc_major} gcov HINTS ${path} PATHS ENV GCOV)
+  find_program(GCOVR NAMES gcovr)
+  message(STATUS "GCOVR = ${GCOVR}")
 
   if(GCOV)
     message(STATUS "Code coverage enabled")
 
     include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/CodeCoverage.cmake)
     append_coverage_compiler_flags_to_target(${TARGET})
-    target_compile_options(${TARGET} PUBLIC -O0 -g -fno-inline -fno-inline-small-functions -fno-default-inline
-                                            --coverage)
+    # no-exceptions to get rid of exception handling branches
+    target_compile_options(
+      ${TARGET}
+      PUBLIC -O0
+             -g
+             -fno-inline
+             -fno-inline-small-functions
+             -fno-default-inline
+             -fno-exceptions
+             --coverage)
+    target_compile_definitions(${TARGET} PUBLIC FLAT_HASH_COVERAGE)
 
     message(STATUS "using gcov = ${GCOV}")
     execute_process(COMMAND ${GCOV} --version)
-    set(GCOVR_ADDITIONAL_ARGS --gcov-executable=${GCOV})
+    set(GCOVR_ADDITIONAL_ARGS --gcov-executable=${GCOV} --config=${CMAKE_SOURCE_DIR}/gcovr.cfg)
     setup_target_for_coverage_gcovr_html(
       NAME
       ${NAME_}_html
