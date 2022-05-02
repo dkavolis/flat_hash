@@ -50,6 +50,8 @@ template <destruct_policy policy = destruct_policy::destruct, erasable Container
 constexpr auto erase_after(Container& container, std::ranges::iterator_t<Container const> pos_)
     -> std::ranges::iterator_t<Container> {
   auto const last = std::ranges::end(container);
+  if (pos_ == std::ranges::cend(container)) [[unlikely]] { return std::ranges::end(container); }
+
   if constexpr (traits_range_erasable<Container>) {
     container_traits<Container>::erase(container, pos_, last);
   } else {
@@ -87,10 +89,6 @@ struct _erase_fn {
     using diff_t = std::ranges::range_difference_t<Container>;
 
     diff_t const offset = first_ - std::ranges::cbegin(container);
-
-    if (first_ == last_) [[unlikely]] { return std::ranges::begin(container) + offset; }
-
-    FLAT_HASH_ASSERT(last_ > first_, "Reversed range!");
 
     if constexpr (traits_range_erasable<Container> && Policy == ordering_policy::preserved) {
       container_traits<Container>::erase(container, first_, last_);

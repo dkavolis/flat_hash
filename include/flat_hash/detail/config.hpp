@@ -33,15 +33,15 @@
 #    include <memory_resource>  // for std::pmr::monotonic_buffer_resource
 #    include <string>           // for std::string
 #  endif
-#  include <functional>       // for std::function
-#  include <source_location>  // for std::source_location
-#  include <string_view>      // for std::string_view
-
-#  include "format.hpp"
-
+#  include <functional>  // for std::function
 #endif
 
+#include <concepts>  // for std::invocable
 #include <numeric>
+#include <source_location>  // for std::source_location
+#include <string_view>      // for std::string_view
+
+#include "format.hpp"
 
 #define ITERATOR_FACADE_NS flat_hash
 #include "iterator_facade.hpp"
@@ -56,6 +56,7 @@ constexpr static T tombstone_v = empty_bucket_v<T> - 1;
 
 namespace detail {
 
+// LCOV_EXCL_START
 #if defined(FLAT_HASH_ENABLE_ASSERTIONS)
 
 inline auto vprint_to(FILE* stream, std::string_view format, FLAT_HASH_FORMAT_NS format_args args) -> std::size_t {
@@ -122,7 +123,7 @@ template <class... Args>
       }                                                                                         \
     }
 #else
-#  define FLAT_HASH_ASSERT(condition, message, ...) FLAT_HASH_ASSUME(condition)
+#  define FLAT_HASH_ASSERT(condition, ...) FLAT_HASH_ASSUME(condition)
 #endif
 
 }  // namespace detail
@@ -139,5 +140,6 @@ inline void reset_assertion_handler() noexcept {
   detail::assertion_handler() = detail::default_assertion_handler;
 #endif
 }
+// LCOV_EXCL_STOP
 
 FLAT_HASH_NAMESPACE_END

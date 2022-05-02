@@ -170,28 +170,37 @@ template <class... Args>
   using Char = std::iter_value_t<decltype(it)>;
   if (it == end) { return {it, options}; }
 
+  // the formatting errors here would be caught at compile time so exclude them from coverage
+
   if (*it == Char{'l'}) {
     options.new_lines = true;
     ++it;
+    // LCOV_EXCL_START
+    if (it == end) [[unlikely]] { FLAT_HASH_ON_FORMAT_ERROR(ctx, "Unterminated format string!"); }
+    // LCOV_EXCL_STOP
   }
 
-  if (it != end) [[likely]] {
-    switch (*it) {
-      case Char{':'}: {
-        // switching to a subformatter
-        ++it;
-        break;
-      }
-      case Char{'}'}: {
-        // end of the format string
-        break;
-      }
-      default: {
+  // LCOV_EXCL_BR_START
+  switch (*it) {
+    case Char{':'}: {
+      // switching to a subformatter
+      ++it;
+      break;
+    }
+    case Char{'}'}: {
+      // end of the format string
+      break;
+    }
+      // LCOV_EXCL_START
+    default:
+      [[unlikely]] {
         FLAT_HASH_ON_FORMAT_ERROR(ctx, "invalid format specifier!");
         break;
       }
-    }
+      // LCOV_EXCL_STOP
   }
+  // LCOV_EXCL_BR_STOP
+
   return {it, options};
 }
 
@@ -215,17 +224,19 @@ template <class Char, std::ranges::sized_range R, class OutputIt,
   return write_to<Char>(it, strings.postfix);
 }
 
+template <class Char>
+constexpr inline auto unformattable_str = std::to_array<Char>({
+    Char{'{'},
+    Char{'?'},
+    Char{'}'},
+});
+
 template <class Char = char, class T>
 [[nodiscard]] constexpr auto maybe_format_arg(T&& value) noexcept -> decltype(auto) {
   if constexpr (formattable<T, Char>) {
     return std::forward<T>(value);
   } else {
-    constexpr auto str = std::to_array<Char>({
-        Char{'{'},
-        Char{'?'},
-        Char{'}'},
-    });
-    return std::basic_string_view<Char>(str.data(), str.size());
+    return std::basic_string_view<Char>(unformattable_str<Char>.data(), unformattable_str<Char>.size());
   }
 }
 

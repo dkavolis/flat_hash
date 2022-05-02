@@ -280,6 +280,15 @@ void _test_erase_section(R container) {
 
     CHECK_THAT(container, Equals(vector));
   }
+
+  WHEN("erasing an empty range") {
+    auto start = GENERATE_COPY(range(diff_t{0}, ssize));
+
+    auto erased_it = detail::containers::policy_erase<ordering>(container, std::ranges::cbegin(container) + start,
+                                                                std::ranges::cbegin(container) + start);
+    CHECK(erased_it == std::ranges::begin(container) + start);
+    CHECK_THAT(container, Equals(vector));
+  }
 }
 
 template <class R>
@@ -356,6 +365,13 @@ void _test_insert_section(R container, std::initializer_list<std::ranges::range_
       std::ranges::sort(vector);
     }
 
+    CHECK_THAT(container, Equals(vector));
+  }
+
+  WHEN("inserting an empty range") {
+    auto offset = GENERATE_COPY(range(diff_t{0}, ssize + 1));
+    detail::containers::policy_insert<ordering>(container, std::ranges::cbegin(container) + offset,
+                                                std::ranges::subrange(vals.begin(), vals.begin()));
     CHECK_THAT(container, Equals(vector));
   }
 }

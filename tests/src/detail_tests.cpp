@@ -422,4 +422,20 @@ TEST_CASE("Generic container functions", "[internal][containers]") {
 
 }  // namespace detail::containers
 
+struct Unformattable {
+  int i;
+};
+
+TEST_CASE("Utilities tests", "[utilities][detail]") {
+  SECTION("maybe_format_arg always return formattable value") {
+    WHEN("argument is already formattable") {
+      CHECK(FLAT_HASH_FORMAT_NS format("{}", detail::maybe_format_arg(42)) == "42");
+    }
+
+    WHEN("argument is not formattable") {
+      CHECK(FLAT_HASH_FORMAT_NS format("{}", detail::maybe_format_arg(Unformattable{42})) == "{?}");
+    }
+  }
+}
+
 FLAT_HASH_NAMESPACE_END

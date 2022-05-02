@@ -1365,7 +1365,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
       if (!bucket_value) [[unlikely]] { continue; }
       if constexpr (!detail::containers::resizable<key_container>) {
         // check that we are still within the container size
-        if (added == n) [[unlikely]] {
+        if (added == n) [[unlikely]] {  // LCOV_EXCL_LINE
           FLAT_HASH_ASSERT(false, "Tried to add more unique values than the container could hold ({:d}): {}", n,
                            detail::maybe_format_arg(values));
           break;
@@ -1507,7 +1507,6 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     requires(detail::set_addable_key<std::ranges::range_value_t<R>, set>)
   constexpr void merge_unique(R&& source) {
     auto const old_size = size();
-    auto const old_ssize = static_cast<difference_type>(old_size);
 
     auto&& values = [&source]() -> decltype(auto) {
       if constexpr (is_set<R>) {
@@ -1519,7 +1518,11 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
       }
     }();
 
+#ifdef __cpp_exceptions
+    auto const old_ssize = static_cast<difference_type>(old_size);
+
     try {
+#endif
       for (auto&& value : values) {
         // guaranteed to contain unique values, only add values that are not already in this set
         if (!contains(value)) {
@@ -1532,11 +1535,13 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
       }
 
       ensure_load_factor(size());
+#ifdef __cpp_exceptions
     } catch (...) {
       // erasing from the end is much less likely to throw if it does
       detail::containers::erase_after(keys_, std::ranges::cbegin(keys_) + old_ssize);
       throw;
     }
+#endif
 
     // no need to rehash previous keys as values were simply placed into key container
     auto const s = static_cast<index_type>(size());

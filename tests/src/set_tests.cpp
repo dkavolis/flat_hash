@@ -669,6 +669,7 @@ TEST_CASE("Sets can be formatted", "[set][format]") {
   CHECK(FLAT_HASH_FORMAT_NS format("{::d}", a) == "{0, 1, 2, 3}");
   CHECK(FLAT_HASH_FORMAT_NS format("{::02d}", a) == "{00, 01, 02, 03}");
   CHECK(FLAT_HASH_FORMAT_NS format("{:l:02d}", a) == "{\n\t00,\n\t01,\n\t02,\n\t03,\n}");
+  CHECK(FLAT_HASH_FORMAT_NS format("{:l}", a) == "{\n\t0,\n\t1,\n\t2,\n\t3,\n}");
 }
 
 TEST_CASE("Sets are convertible to equivalent sets", "[set][convertible]") {
