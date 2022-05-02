@@ -11,15 +11,8 @@
                 }
             },
             "inherits": [
-                "develop",
-                "Release"
-            ]
-        },
-        {
-            "name": "ci-linux-fmt",
-            "inherits": [
-                "ci-linux",
-                "use-fmtlib"
+                "Release",
+                "develop"
             ]
         },
         {
@@ -27,13 +20,6 @@
             "inherits": [
                 "Debug",
                 "ci-linux"
-            ]
-        },
-        {
-            "name": "ci-linux-fmt-debug",
-            "inherits": [
-                "Debug",
-                "ci-linux-fmt"
             ]
         },
         {
@@ -51,24 +37,10 @@
             }
         },
         {
-            "name": "ci-msvc-fmt",
-            "inherits": [
-                "ci-msvc",
-                "use-fmtlib"
-            ]
-        },
-        {
             "name": "ci-msvc-debug",
             "inherits": [
                 "Debug",
                 "ci-msvc"
-            ]
-        },
-        {
-            "name": "ci-msvc-fmt-debug",
-            "inherits": [
-                "Debug",
-                "ci-msvc-fmt"
             ]
         },
         {
@@ -85,36 +57,74 @@
     ],
     "buildPresets": [
         {
+            "name": "std",
+            "hidden": true,
+            "targets": [
+                "flat_hash_tests"
+            ]
+        },
+        {
+            "name": "fmt",
+            "hidden": true,
+            "targets": [
+                "flat_hash_tests-fmt"
+            ]
+        },
+        {
             "name": "ci-msvc",
-            "configurePreset": "ci-msvc"
+            "configurePreset": "ci-msvc",
+            "inherits": [
+                "std"
+            ]
         },
         {
             "name": "ci-linux",
-            "configurePreset": "ci-linux"
+            "configurePreset": "ci-linux",
+            "inherits": [
+                "std"
+            ]
         },
         {
             "name": "ci-msvc-fmt",
-            "configurePreset": "ci-msvc-fmt"
+            "configurePreset": "ci-msvc",
+            "inherits": [
+                "fmt"
+            ]
         },
         {
             "name": "ci-linux-fmt",
-            "configurePreset": "ci-linux-fmt"
+            "configurePreset": "ci-linux",
+            "inherits": [
+                "fmt"
+            ]
         },
         {
             "name": "ci-msvc-debug",
-            "configurePreset": "ci-msvc-debug"
+            "configurePreset": "ci-msvc-debug",
+            "inherits": [
+                "std"
+            ]
         },
         {
             "name": "ci-linux-debug",
-            "configurePreset": "ci-linux-debug"
+            "configurePreset": "ci-linux-debug",
+            "inherits": [
+                "std"
+            ]
         },
         {
             "name": "ci-msvc-fmt-debug",
-            "configurePreset": "ci-msvc-fmt-debug"
+            "configurePreset": "ci-msvc-debug",
+            "inherits": [
+                "fmt"
+            ]
         },
         {
             "name": "ci-linux-fmt-debug",
-            "configurePreset": "ci-linux-fmt-debug"
+            "configurePreset": "ci-linux-debug",
+            "inherits": [
+                "fmt"
+            ]
         },
         {
             "name": "ci-codecov",
@@ -126,36 +136,67 @@
     ],
     "testPresets": [
         {
+            "name": "default",
+            "hidden": true,
+            "execution": {
+                "noTestsAction": "ignore"
+            }
+        },
+        {
             "name": "ci-msvc",
-            "configurePreset": "ci-msvc"
+            "configurePreset": "ci-msvc",
+            "inherits": [
+                "default"
+            ]
         },
         {
             "name": "ci-linux",
-            "configurePreset": "ci-linux"
+            "configurePreset": "ci-linux",
+            "inherits": [
+                "default"
+            ]
         },
         {
             "name": "ci-msvc-fmt",
-            "configurePreset": "ci-msvc-fmt"
+            "configurePreset": "ci-msvc",
+            "inherits": [
+                "default"
+            ]
         },
         {
             "name": "ci-linux-fmt",
-            "configurePreset": "ci-linux-fmt"
+            "configurePreset": "ci-linux",
+            "inherits": [
+                "default"
+            ]
         },
         {
             "name": "ci-msvc-debug",
-            "configurePreset": "ci-msvc-debug"
+            "configurePreset": "ci-msvc-debug",
+            "inherits": [
+                "default"
+            ]
         },
         {
             "name": "ci-linux-debug",
-            "configurePreset": "ci-linux-debug"
+            "configurePreset": "ci-linux-debug",
+            "inherits": [
+                "default"
+            ]
         },
         {
             "name": "ci-msvc-fmt-debug",
-            "configurePreset": "ci-msvc-fmt-debug"
+            "configurePreset": "ci-msvc-debug",
+            "inherits": [
+                "default"
+            ]
         },
         {
             "name": "ci-linux-fmt-debug",
-            "configurePreset": "ci-linux-fmt-debug"
+            "configurePreset": "ci-linux-debug",
+            "inherits": [
+                "default"
+            ]
         },
         {
             "name": "ci-codecov",

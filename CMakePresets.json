@@ -54,14 +54,7 @@
       "hidden": true,
       "inherits": [
         "default",
-        "enable-tests"
-      ]
-    },
-    {
-      "name": "develop-fmt",
-      "hidden": true,
-      "inherits": [
-        "develop",
+        "enable-tests",
         "use-fmtlib"
       ]
     },

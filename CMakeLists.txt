@@ -5,15 +5,16 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(cmake/vcpkg.cmake)
 
+vcpkg_feature(FLAT_HASH_BUILD_TESTS "Build tests" OFF "test")
+vcpkg_feature(FLAT_HASH_USE_FMTLIB "Use fmtlib instead of <format>" OFF "fmt")
+
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
-  set(_is_debug_build TRUE)
+  set(_enable_assertions TRUE)
 else()
-  set(_is_debug_build FALSE)
+  set(_enable_assertions FALSE)
 endif()
 
-vcpkg_feature(FLAT_HASH_USE_FMTLIB "Use fmtlib instead of <format>" OFF "fmt")
-option(FLAT_HASH_ENABLE_ASSERTIONS "Enable assertions" ${_is_debug_build})
-vcpkg_feature(FLAT_HASH_BUILD_TESTS "Build tests" OFF "test")
+option(FLAT_HASH_ENABLE_ASSERTIONS "Enable assertions" ${_enable_assertions})
 
 option(FLAT_HASH_ENABLE_DOXYGEN "Enable Doxygen documentation builds of source." OFF)
 
@@ -36,24 +37,27 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   )
 endif()
 
-if(NOT FLAT_HASH_USE_FMTLIB)
-  include(CheckIncludeFileCXX)
-  check_include_file_cxx(format _has_cxx_format)
-  if(NOT _has_cxx_format)
-    message(
-      FATAL_ERROR
-        "Standard library does not have <format> include, consider using fmtlib with -DFLAT_HASH_USE_FMTLIB instead")
-  endif()
+add_library(flat_hash_base INTERFACE)
+
+if(MSVC)
+  target_sources(flat_hash_base INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/tools/flat_hash.natvis>
+                                          $<INSTALL_INTERFACE:include/flat_hash/flat_hash.natvis>)
+endif()
+
+target_compile_features(flat_hash_base INTERFACE cxx_std_20)
+
+target_compile_definitions(flat_hash_base
+                           INTERFACE $<$<BOOL:${FLAT_HASH_ENABLE_ASSERTIONS}>:FLAT_HASH_ENABLE_ASSERTIONS>)
+
+target_include_directories(flat_hash_base INTERFACE $<INSTALL_INTERFACE:include>
+                                                    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+
+if(MSVC)
+  target_compile_options(flat_hash_base INTERFACE "/Zc:preprocessor;/Zc:__cplusplus")
 endif()
 
 add_library(flat_hash INTERFACE)
-
-if(MSVC)
-  target_sources(flat_hash INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/tools/flat_hash.natvis>
-                                     $<INSTALL_INTERFACE:include/flat_hash/flat_hash.natvis>)
-endif()
-
-target_compile_features(flat_hash INTERFACE cxx_std_20)
+target_link_libraries(flat_hash INTERFACE flat_hash_base)
 
 if(MSVC)
   include(cmake/utils.cmake)
@@ -69,25 +73,20 @@ if(MSVC)
   if(NOT HAVE_RANGES OR NOT HAVE_FORMAT)
     target_compile_features(flat_hash INTERFACE cxx_std_23)
   endif()
-else()
-
-endif()
-target_compile_definitions(flat_hash INTERFACE $<$<BOOL:${FLAT_HASH_ENABLE_ASSERTIONS}>:FLAT_HASH_ENABLE_ASSERTIONS>)
-
-target_include_directories(flat_hash INTERFACE $<INSTALL_INTERFACE:include>
-                                               $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-
-if(MSVC)
-  target_compile_options(flat_hash INTERFACE "/Zc:preprocessor;/Zc:__cplusplus")
-endif()
-
-if(FLAT_HASH_USE_FMTLIB)
-  find_package(fmt REQUIRED)
-  target_link_libraries(flat_hash INTERFACE fmt::fmt)
-  target_compile_definitions(flat_hash INTERFACE FLAT_HASH_USE_FMTLIB)
 endif()
 
 add_library(flat_hash::flat_hash ALIAS flat_hash)
+
+if(FLAT_HASH_USE_FMTLIB)
+  find_package(fmt 8 CONFIG REQUIRED)
+else()
+  find_package(fmt 8 CONFIG QUIET)
+endif()
+
+if(fmt_FOUND)
+  include(cmake/flat_hashMacros.cmake)
+  add_fmt_lib(flat_hash-fmt fmt::fmt)
+endif()
 
 include(cmake/CPM.cmake)
 cpmaddpackage(
@@ -115,16 +114,23 @@ if(FLAT_HASH_ENABLE_DOXYGEN)
 endif()
 
 include(GNUInstallDirs)
+
+# let install without building tests since this is only an interface library
+set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY TRUE)
+
 install(
-  TARGETS flat_hash
-  EXPORT flat_hashTargets
+  TARGETS flat_hash_base
+  EXPORT flat_hash_baseTargets
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   INCLUDES
   DESTINATION include
   PUBLIC_HEADER DESTINATION include)
+install(TARGETS flat_hash EXPORT flat_hashTargets)
 
+install(EXPORT flat_hash_baseTargets FILE flat_hash_baseTargets.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/flat_hash)
 install(EXPORT flat_hashTargets FILE flat_hashTargets.cmake NAMESPACE flat_hash::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/flat_hash)
 
@@ -144,7 +150,7 @@ configure_package_config_file(
   INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/flat_hash)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/flat_hashConfig.cmake ${CMAKE_CURRENT_BINARY_DIR}/flat_hashConfigVersion.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/flat_hash)
+              ${CMAKE_CURRENT_LIST_DIR}/cmake/flat_hashMacros.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/flat_hash)
 
 if(FLAT_HASH_BUILD_TESTS)
   enable_testing()

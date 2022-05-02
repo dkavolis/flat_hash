@@ -59,6 +59,5 @@ runs:
         CMAKE_BUILD_PARALLEL_LEVEL: ${{ inputs.threads }}
       with:
         cmakeListsTxtPath: "${{ github.workspace }}/CMakeLists.txt"
-        configurePreset: ${{ inputs.cmakePreset }}
         buildPreset: ${{ inputs.cmakePreset }}
         testPreset: ${{ inputs.cmakePreset }}

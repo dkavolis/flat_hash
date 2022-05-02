@@ -25,14 +25,14 @@ endif()
 
 set(VCPKG_HASH_PREV "${vcpkg_hash}" CACHE STRING "" FORCE)
 
-macro(vcpkg_add_feature FEATURE)
-  list(APPEND VCPKG_MANIFEST_FEATURES "${FEATURE}")
+macro(vcpkg_add_feature)
+  list(APPEND VCPKG_MANIFEST_FEATURES "${ARGN}")
 endmacro()
 
-macro(vcpkg_feature NAME DOC VALUE FEATURE)
+macro(vcpkg_feature NAME DOC VALUE)
   option(${NAME} ${DOC} ${VALUE})
 
   if(${${NAME}})
-    vcpkg_add_feature(${FEATURE})
+    vcpkg_add_feature(${ARGN})
   endif()
 endmacro()

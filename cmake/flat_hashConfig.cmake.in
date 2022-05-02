@@ -4,6 +4,19 @@ set(@PROJECT_NAME@_VERSION @PROJECT_VERSION@)
 
 set_and_check(@PROJECT_NAME@_INCLUDE_DIR "@CMAKE_INSTALL_FULL_INCLUDEDIR@")
 
+include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@_baseTargets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Macros.cmake")
+
+if(fmt IN_LIST @PROJECT_NAME@_FIND_COMPONENTS)
+    include(CMakeFindDependencyMacro)
+    find_dependency(fmt 8 CONFIG)
+
+    if(fmt_FOUND)
+        set(@PROJECT_NAME@_fmt_FOUND TRUE)
+        add_fmt_lib(@PROJECT_NAME@-fmt fmt::fmt)
+        add_fmt_lib(@PROJECT_NAME@-fmt-header-only fmt::fmt-header-only)
+    endif()
+endif()
 
 check_required_components(@PROJECT_NAME@)
