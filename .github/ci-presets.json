@@ -136,71 +136,85 @@
     ],
     "testPresets": [
         {
-            "name": "default",
+            "name": "std",
             "hidden": true,
-            "execution": {
-                "noTestsAction": "ignore"
+            "filter": {
+                "exclude": {
+                    "name": "fmt"
+                }
+            }
+        },
+        {
+            "name": "fmt",
+            "hidden": true,
+            "filter": {
+                "include": {
+                    "name": "fmt"
+                }
             }
         },
         {
             "name": "ci-msvc",
             "configurePreset": "ci-msvc",
             "inherits": [
-                "default"
+                "std"
             ]
         },
         {
             "name": "ci-linux",
             "configurePreset": "ci-linux",
             "inherits": [
-                "default"
+                "std"
             ]
         },
         {
             "name": "ci-msvc-fmt",
             "configurePreset": "ci-msvc",
             "inherits": [
-                "default"
+                "fmt"
             ]
         },
         {
             "name": "ci-linux-fmt",
             "configurePreset": "ci-linux",
             "inherits": [
-                "default"
+                "fmt"
             ]
         },
         {
             "name": "ci-msvc-debug",
             "configurePreset": "ci-msvc-debug",
             "inherits": [
-                "default"
+                "std"
             ]
         },
         {
             "name": "ci-linux-debug",
             "configurePreset": "ci-linux-debug",
             "inherits": [
-                "default"
+                "std"
             ]
         },
         {
             "name": "ci-msvc-fmt-debug",
             "configurePreset": "ci-msvc-debug",
             "inherits": [
-                "default"
+                "fmt"
             ]
         },
         {
             "name": "ci-linux-fmt-debug",
             "configurePreset": "ci-linux-debug",
             "inherits": [
-                "default"
+                "fmt"
             ]
         },
         {
             "name": "ci-codecov",
-            "configurePreset": "ci-codecov"
+            "configurePreset": "ci-codecov",
+            "inherits": [
+                "fmt"
+            ]
         }
     ]
 }
