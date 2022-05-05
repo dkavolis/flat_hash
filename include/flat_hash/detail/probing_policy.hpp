@@ -210,6 +210,7 @@ class robin_hood {
     std::uint64_t index{};
     std::uint64_t mask{};
     std::uint16_t psl = 0;
+    std::uint16_t max_psl = std::numeric_limits<std::uint16_t>::max();
 
     constexpr void increment() noexcept {
       ++index;
@@ -220,7 +221,7 @@ class robin_hood {
     [[nodiscard]] constexpr auto equals(insert_end /*unused*/) const noexcept -> bool {
       return psl > static_cast<std::uint16_t>(begin[static_cast<difference_type>(index)] & psl_mask);
     }
-    [[nodiscard]] constexpr auto equals(lookup_end /*unused*/) const noexcept -> bool { return false; }
+    [[nodiscard]] constexpr auto equals(lookup_end /*unused*/) const noexcept -> bool { return psl > max_psl; }
   };
 
   template <std::ranges::random_access_range R>
@@ -237,6 +238,7 @@ class robin_hood {
         /* .index = */ hash & mask,
         /* .mask = */ mask,
         /* .psl = */ 0,
+        /* .max_psl = */ max_psl_,
     };
   }
 
@@ -258,6 +260,7 @@ class robin_hood {
   template <std::ranges::random_access_range R>
   constexpr void pre_insert(R& r, iterator<std::ranges::iterator_t<R const>> state) noexcept {
     constexpr auto empty_value = empty_bucket_v<std::ranges::range_value_t<R>>;
+    update_max_psl(state.psl);
     auto new_width = static_cast<std::uint8_t>(std::bit_width(state.psl));
 
     if (new_width > psl_bits_) [[unlikely]] {
@@ -307,6 +310,7 @@ class robin_hood {
       // this would too annoying to try and hit if it's even possible
       if (psl > max_psl) [[unlikely]] { change_width(r, static_cast<std::uint8_t>(std::bit_width(psl))); }
       // LCOV_EXCL_STOP
+      update_max_psl(psl);
       *next = encode_psl(data, psl);
 
       payload = next_payload;
@@ -359,6 +363,7 @@ class robin_hood {
   }
 
  private:
+  std::uint16_t max_psl_ = 0;
   std::uint8_t psl_bits_ = default_psl_bits;
 
   template <std::integral T>
@@ -389,6 +394,11 @@ class robin_hood {
     }
 
     psl_bits_ = new_width;
+  }
+
+  template <std::integral I>
+  constexpr auto update_max_psl(I psl) noexcept {
+    max_psl_ = std::max(max_psl_, static_cast<std::uint16_t>(psl));
   }
 };
 
