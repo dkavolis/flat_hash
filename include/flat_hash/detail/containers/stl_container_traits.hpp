@@ -283,10 +283,14 @@ struct stl_container_traits {
    */
   template <std::ranges::input_range Values>
     requires(detail::containers::member_insert<R, Values> ||
+             (detail::containers::member_insert<R, value_type&&> &&
+              detail::containers::constructible_from<value_type, Values>) ||
              detail::containers::member_insert<R, std::ranges::iterator_t<Values>, std::ranges::sentinel_t<Values>>)
   constexpr static auto insert(R& container, const_iterator pos, Values&& values) -> decltype(auto) {
     if constexpr (detail::containers::member_insert<R, Values>) {
       return container.insert(pos, std::forward<Values>(values));
+    } else if constexpr (detail::containers::constructible_from<value_type, Values>) {
+      return container.insert(pos, detail::containers::construct<value_type>(std::forward<Values>(values)));
     } else {
       return container.insert(pos, std::ranges::begin(values), std::ranges::end(values));
     }
