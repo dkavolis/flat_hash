@@ -831,7 +831,7 @@ FLAT_HASH_TEST_CASE_SIG("Sets remain valid even with lots of collisions", "[set]
   REQUIRE(s.bucket_count() == 4);
 
   constexpr static std::initializer_list<int> values = {
-      0, 8, 16, 24, 32, 40, 48, 56, 64,
+      0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160,
   };
   constexpr static auto ssize = static_cast<int>(values.size());
 
