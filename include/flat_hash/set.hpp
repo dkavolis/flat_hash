@@ -1430,8 +1430,9 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
           // may throw so do it first before updating hash table
           out = detail::containers::policy_insert<ordering>(keys_, pos.base(), forwarded_key());
 
-          hash_table_.insert(table_iterator, *bucket_value);
+          // first modify the swapped bucket because insert may invalidate it, i.e. robin_hood probing
           hash_table_.overwrite(swap_iter, static_cast<index_type>(ssize() - 1));
+          hash_table_.insert(table_iterator, *bucket_value);
         } else {
           detail::containers::emplace_back(keys_, forwarded_key());
           hash_table_.insert(table_iterator, *bucket_value);
