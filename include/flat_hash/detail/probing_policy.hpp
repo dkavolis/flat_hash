@@ -191,6 +191,7 @@ struct quadratic : basic_probing_policy {
 
 /**
  * @brief Robin-Hood hashing policy with linear probing and back-shifting
+ * https://programming.guide/robin-hood-hashing.html
  */
 class robin_hood {
  public:
@@ -270,8 +271,6 @@ class robin_hood {
     auto index = pos - std::ranges::cbegin(r);
     auto begin = std::ranges::begin(r);
     auto it = begin + index;
-    auto next = it;
-    auto end = std::ranges::end(r);
 
     // cache the data in the next bucket to do the shifting in a single pass
     auto payload = *it;
@@ -279,6 +278,9 @@ class robin_hood {
       // bucket is already empty
       return;
     }
+
+    auto next = it;
+    auto end = std::ranges::end(r);
     auto next_payload = payload;
     std::uint16_t psl = decode_psl(payload);
 
@@ -288,32 +290,30 @@ class robin_hood {
       // find the next bucket where this is going to be shifted to
       while (true) {
         ++next;
+        ++psl;  // current psl if the value was shifted now
 
         // wrap around
         if (next == end) [[unlikely]] { next = begin; }
 
         // can shift into empty bucket
         if (*next == empty_value) { break; }
-        // the next bucket has greater PSL than the current so it is going to be shifted as well
-        // skipping over buckets with the same PSL will reduce the number of shifts needed
-        if (decode_psl(*next) > psl) { break; }
+        // only shift if the next bucket has lower PSL
+        if (decode_psl(*next) < psl) { break; }
       }
 
-      payload = next_payload;
-      psl = decode_psl(payload);
       next_payload = *next;
-
-      auto data = decode(payload);
-
       // shift the value from the current bucket to the next and increment PSL
-      *next = encode_psl(data, psl + 1);
+      auto data = decode(payload);
+      *next = encode_psl(data, psl);
+
+      payload = next_payload;
 
       if (next_payload == empty_value) {
         // nothing to shift
         return;
       }
 
-      it = next;
+      psl = decode_psl(payload);
     }
 
     FLAT_HASH_UNREACHABLE();
