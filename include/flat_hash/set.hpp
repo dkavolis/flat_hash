@@ -433,7 +433,8 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
       clear();
       merge(values);
     } else {
-      if (!empty()) { hash_table_.clear(); }
+      // static set, cannot be empty
+      hash_table_.clear();
       assign(values);
     }
     return *this;
