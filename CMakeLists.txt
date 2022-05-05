@@ -39,10 +39,8 @@ endif()
 
 add_library(flat_hash_base INTERFACE)
 
-if(MSVC)
-  target_sources(flat_hash_base INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/tools/flat_hash.natvis>
-                                          $<INSTALL_INTERFACE:include/flat_hash/flat_hash.natvis>)
-endif()
+target_sources(flat_hash_base INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/tools/flat_hash.natvis>
+                                        $<INSTALL_INTERFACE:include/flat_hash/flat_hash.natvis>)
 
 target_compile_features(flat_hash_base INTERFACE cxx_std_20)
 
@@ -137,10 +135,8 @@ install(EXPORT flat_hashTargets FILE flat_hashTargets.cmake NAMESPACE flat_hash:
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/flat_hash)
 
 configure_file(${CMAKE_CURRENT_LIST_DIR}/cmake/version.hpp.in include/flat_hash/version.hpp @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/flat_hash/version.hpp DESTINATION include/flat_hash)
-if(MSVC)
-  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/tools/flat_hash.natvis DESTINATION include/flat_hash)
-endif()
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/flat_hash/version.hpp
+              ${CMAKE_CURRENT_SOURCE_DIR}/tools/flat_hash.natvis DESTINATION include/flat_hash)
 
 install(DIRECTORY include/flat_hash DESTINATION include)
 
