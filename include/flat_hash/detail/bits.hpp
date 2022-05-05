@@ -80,6 +80,16 @@ concept valid_key = (std::same_as<std::remove_cvref_t<T>, Key> ||
                      (transparent_functor<Hash> && transparent_functor<KeyEq> && hash_for<Hash, T> &&
                       equality_comparator<KeyEq, T, Key>));
 
+// not in std...
+template <class T, class U>
+concept weakly_equality_comparable_with =
+    requires(const std::remove_reference_t<T>& t, const std::remove_reference_t<U>& u) {
+      { t == u } -> std::convertible_to<bool>;
+      { t != u } -> std::convertible_to<bool>;
+      { u == t } -> std::convertible_to<bool>;
+      { u != t } -> std::convertible_to<bool>;
+    };
+
 template <class T>
 struct maybe_empty {
   T value;

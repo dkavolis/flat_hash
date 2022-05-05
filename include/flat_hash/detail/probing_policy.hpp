@@ -33,37 +33,46 @@ FLAT_HASH_NAMESPACE_BEGIN
 
 namespace probing {
 
-template <class T, class R>
-concept unsigned_or_range_iterator = std::ranges::range<R> &&
-                                     (std::unsigned_integral<T> || std::convertible_to<T, std::ranges::iterator_t<R>>);
+/**
+ * @brief Sentinel representing probing iterator equal to insert position
+ */
+struct insert_end {};
 
-template <class T, class R>
-concept probing_iterator = requires(T it) {
-                             { *it } -> unsigned_or_range_iterator<R>;
-                           };
+/**
+ * @brief Sentinel representing probing iterator equal to lookup end, empty buckets are handled independently
+ */
+struct lookup_end {};
 
-template <class T, class R>
-concept probing_range = (std::ranges::input_range<T> && probing_iterator<std::ranges::iterator_t<T>, R>);
+template <class T>
+concept probing_end_type =
+    std::same_as<insert_end, std::remove_cvref_t<T>> || std::same_as<lookup_end, std::remove_cvref_t<T>>;
+
+template <class T>
+concept probing_iterator = std::input_iterator<T> &&
+                           requires(T it) {
+                             { *it } -> std::integral;
+                           } && detail::weakly_equality_comparable_with<T, insert_end> &&
+                           detail::weakly_equality_comparable_with<T, lookup_end>;
 
 template <class T, std::ranges::random_access_range R>
   requires requires(T const& policy, R const& range, std::uint64_t hash) {
-             { policy.probe(range, hash) } -> probing_range<R>;
+             { policy.probe(range, hash) } -> probing_iterator;
            }
-using probing_iterator_t = std::ranges::iterator_t<decltype(std::declval<T>().probe(std::declval<R&>(), 0))>;
+using iterator_t = decltype(std::declval<T>().probe(std::declval<R&>(), 0));
 
 // clang-format off
 
 template <class T, class R = std::vector<std::uint32_t>>
 concept probing_policy = std::ranges::random_access_range<R> && std::is_move_constructible_v<T> &&
     requires(T const& policy, R const& container, std::uint64_t hash) {
-  { policy.probe(container, hash) } -> probing_range<R>;
+  { policy.probe(container, hash) } -> probing_iterator;
   { policy.reserved_bits() } noexcept -> std::unsigned_integral;
   { policy.max_load_factor() } noexcept -> std::floating_point;
   requires requires(std::ranges::range_value_t<R> payload) {
     { policy.decode(payload) } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
   };
   // immutable ranges don't need encode/replace and pre_insert/post_erase
-  requires (!detail::mutable_range<R> || requires(std::ranges::range_value_t<R> v, probing_iterator_t<T, R> state) {
+  requires (!detail::mutable_range<R> || requires(std::ranges::range_value_t<R> v, iterator_t<T, R> state) {
     { policy.encode(v, state) } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
     { policy.reencode(v, v) } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
     requires requires(T& pol, std::ranges::iterator_t<R> pos) {
@@ -74,11 +83,6 @@ concept probing_policy = std::ranges::random_access_range<R> && std::is_move_con
 };
 
 // clang-format on
-
-/**
- * @brief Default sentinel for probing policies, use it to mark the slot for insertion
- */
-struct sentinel {};
 
 /**
  * @brief Disable tombstones if your probing policy takes care of empty slots on removal
@@ -132,23 +136,22 @@ struct python : basic_probing_policy {
       index = (index * 5 + perturb + 1) & mask;
     }
     [[nodiscard]] constexpr auto dereference() const noexcept -> std::uint64_t { return index; }
-    [[nodiscard]] static constexpr auto equals(sentinel /*unused*/) noexcept -> bool { return false; }
+    [[nodiscard]] static constexpr auto equals(insert_end /*unused*/) noexcept -> bool { return false; }
+    [[nodiscard]] static constexpr auto equals(lookup_end /*unused*/) noexcept -> bool { return false; }
   };
 
   template <std::ranges::random_access_range R>
-  [[nodiscard]] constexpr auto probe(R const& r, std::uint64_t hash) const noexcept
-      -> std::ranges::subrange<iterator, sentinel> {
+  [[nodiscard]] constexpr auto probe(R const& r, std::uint64_t hash) const noexcept -> iterator {
     auto size = std::ranges::size(r);
     FLAT_HASH_ASSERT(std::has_single_bit(size), "Expected the container size to be a power of 2, instead got {:d}",
                      size);
     auto mask = size - 1;
-    return {iterator{
-                {},  // facade base
-                /* .perturb = */ hash,
-                /* .index = */ hash & mask,
-                /* .mask = */ mask,
-            },
-            sentinel{}};
+    return {
+        {},  // facade base
+        /* .perturb = */ hash,
+        /* .index = */ hash & mask,
+        /* .mask = */ mask,
+    };
   }
 
   [[nodiscard]] static constexpr auto max_load_factor() noexcept -> double { return 0.666666666666666666667; }
@@ -168,23 +171,22 @@ struct quadratic : basic_probing_policy {
       ++i;
     }
     [[nodiscard]] constexpr auto dereference() const noexcept -> std::uint64_t { return index; }
-    [[nodiscard]] static constexpr auto equals(sentinel /*unused*/) noexcept -> bool { return false; }
+    [[nodiscard]] static constexpr auto equals(insert_end /*unused*/) noexcept -> bool { return false; }
+    [[nodiscard]] static constexpr auto equals(lookup_end /*unused*/) noexcept -> bool { return false; }
   };
 
   template <std::ranges::random_access_range R>
-  [[nodiscard]] constexpr auto probe(R const& r, std::uint64_t hash) const noexcept
-      -> std::ranges::subrange<iterator, sentinel> {
+  [[nodiscard]] constexpr auto probe(R const& r, std::uint64_t hash) const noexcept -> iterator {
     auto size = std::ranges::size(r);
     FLAT_HASH_ASSERT(std::has_single_bit(size), "Expected the container size to be a power of 2, instead got {:d}",
                      size);
     auto mask = size - 1;
-    return {iterator{
-                {},  // facade base
-                /* .i = */ 0,
-                /* .index = */ hash & mask,
-                /* .mask = */ mask,
-            },
-            sentinel{}};
+    return {
+        {},  // facade base
+        /* .i = */ 0,
+        /* .index = */ hash & mask,
+        /* .mask = */ mask,
+    };
   }
 };
 
@@ -215,27 +217,27 @@ class robin_hood {
       ++psl;
     }
     [[nodiscard]] constexpr auto dereference() const noexcept -> std::uint64_t { return index; }
-    [[nodiscard]] constexpr auto equals(sentinel /*unused*/) const noexcept -> bool {
+    [[nodiscard]] constexpr auto equals(insert_end /*unused*/) const noexcept -> bool {
       return psl > static_cast<std::uint16_t>(begin[static_cast<difference_type>(index)] & psl_mask);
     }
+    [[nodiscard]] constexpr auto equals(lookup_end /*unused*/) const noexcept -> bool { return false; }
   };
 
   template <std::ranges::random_access_range R>
   [[nodiscard]] constexpr auto probe(R const& r, std::uint64_t hash) const noexcept
-      -> std::ranges::subrange<iterator<std::ranges::iterator_t<R const>>, sentinel> {
+      -> iterator<std::ranges::iterator_t<R const>> {
     auto size = std::ranges::size(r);
     FLAT_HASH_ASSERT(std::has_single_bit(size), "Expected the container size to be a power of 2, instead got {:d}",
                      size);
     auto mask = size - 1;
-    return {iterator{
-                {},  // facade base...
-                /* .begin = */ std::ranges::begin(r),
-                /* .psl_mask = */ psl_mask<std::ranges::range_value_t<R>>(),
-                /* .index = */ hash & mask,
-                /* .mask = */ mask,
-                /* .psl = */ 0,
-            },
-            sentinel{}};
+    return {
+        {},  // facade base...
+        /* .begin = */ std::ranges::begin(r),
+        /* .psl_mask = */ psl_mask<std::ranges::range_value_t<R>>(),
+        /* .index = */ hash & mask,
+        /* .mask = */ mask,
+        /* .psl = */ 0,
+    };
   }
 
   [[nodiscard]] constexpr auto reserved_bits() const noexcept -> std::uint8_t { return psl_bits_; }
@@ -258,13 +260,9 @@ class robin_hood {
     constexpr auto empty_value = empty_bucket_v<std::ranges::range_value_t<R>>;
     auto new_width = static_cast<std::uint8_t>(std::bit_width(state.psl));
 
-    if (new_width > psl_bits_) {
+    if (new_width > psl_bits_) [[unlikely]] {
       // number of data bits has changed so have to reencode the entire range
-      for (auto& bucket_value : r) {
-        if (bucket_value != empty_value) { bucket_value = change_psl_width(bucket_value, new_width); }
-      }
-
-      psl_bits_ = new_width;
+      change_width(r, new_width);
     }
 
     auto index = static_cast<std::ranges::range_difference_t<R>>(state.index);
@@ -282,6 +280,7 @@ class robin_hood {
     auto end = std::ranges::end(r);
     auto next_payload = payload;
     std::uint16_t psl = decode_psl(payload);
+    auto max_psl = static_cast<std::uint16_t>(1U << psl_bits_);
 
     // payload is cached and it is going to be shifted out so can easily clear the bucket
     *it = empty_value;
@@ -303,6 +302,11 @@ class robin_hood {
       next_payload = *next;
       // shift the value from the current bucket to the next and increment PSL
       auto data = decode(payload);
+      // ensure that shifted psl always fits
+      // LCOV_EXCL_START
+      // this would too annoying to try and hit if it's even possible
+      if (psl > max_psl) [[unlikely]] { change_width(r, static_cast<std::uint8_t>(std::bit_width(psl))); }
+      // LCOV_EXCL_STOP
       *next = encode_psl(data, psl);
 
       payload = next_payload;
@@ -375,6 +379,16 @@ class robin_hood {
   template <std::integral T>
   [[nodiscard]] constexpr auto change_psl_width(T value, std::uint8_t width) const noexcept -> T {
     return ((value >> psl_bits_) << width) | decode_psl(value);
+  }
+
+  template <std::ranges::range R>
+  constexpr auto change_width(R& range, std::uint8_t new_width) noexcept {
+    constexpr auto empty_value = empty_bucket_v<std::ranges::range_value_t<R>>;
+    for (auto& bucket_value : range) {
+      if (bucket_value != empty_value) { bucket_value = change_psl_width(bucket_value, new_width); }
+    }
+
+    psl_bits_ = new_width;
   }
 };
 

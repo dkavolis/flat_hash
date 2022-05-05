@@ -51,7 +51,7 @@ struct reserved_data {
   std::uint8_t bits;
 };
 
-template <std::ranges::random_access_range R, probing::probing_iterator<R> Iter>
+template <std::ranges::random_access_range R, probing::probing_iterator Iter>
 [[nodiscard]] constexpr auto iterator_at(R& container [[maybe_unused]], Iter const& iterator) noexcept
     -> std::ranges::iterator_t<R> {
   if constexpr (std::integral<decltype(*iterator)>) {
@@ -86,7 +86,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   using value_type = std::ranges::range_value_t<Container>;
   using difference_type = std::ranges::range_difference_t<Container>;
   using policy = Policy;
-  using probing_iterator = probing::probing_iterator_t<policy, Container>;
+  using probing_iterator = probing::iterator_t<policy, Container>;
 
   constexpr static bool uses_tombstones = !probing::disable_tombstones_v<Policy>;
 
@@ -420,18 +420,17 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
 
   [[nodiscard]] constexpr auto find_if(std::uint64_t hash, always_false_t /* unused */) const noexcept
       -> std::pair<probing_iterator, found> {
-    auto probing_range = policy_.get().probe(indices_, hash);
-    probing_iterator probe_it = std::ranges::begin(probing_range);
+    auto probe = policy_.get().probe(indices_, hash);
 
-    while (true) {
-      value_type payload = *iterator_at(indices_, probe_it);
-      // predicate always returns false so there's no need to look any values matching it
-      if (payload >= tombstone) { return {probe_it, found::insertion}; }
+    while (probe != probing::lookup_end{}) {
+      value_type payload = *iterator_at(indices_, probe);
+      // predicate always returns false so there's no need to look for any values matching it
+      if (payload >= tombstone) { break; }
 
-      ++probe_it;
+      ++probe;
     }
 
-    FLAT_HASH_UNREACHABLE();
+    return {probe, found::insertion};
   }
 
   template <std::predicate<value_type> Predicate>
@@ -440,41 +439,42 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
     // keep track of the insertion bucket in case there is no valid predicate
     std::optional<probing_iterator> insert_it = std::nullopt;
 
-    auto probing_range = policy_.get().probe(indices_, hash);
-    probing_iterator probe_it = std::ranges::begin(probing_range);
-    std::sentinel_for<probing_iterator> auto end = std::ranges::end(probing_range);
+    auto probe = policy_.get().probe(indices_, hash);
 
-    while (true) {
-      value_type payload = *iterator_at(indices_, probe_it);
+    while (probe != probing::lookup_end{}) {
+      value_type payload = *iterator_at(indices_, probe);
 
       if (payload == npos) {
-        // empty bucket, no need to continue anymore, did not find what we were looking for
-        // return the insert iterator if it's set, or the current one
-        return {insert_it.value_or(probe_it), found::insertion};
+        // empty bucket, no need to continue anymore
+        break;
       }
 
       if constexpr (uses_tombstones) {
         // cache the first empty bucket for insertion
         if (payload == tombstone) [[unlikely]] {
-          if (!insert_it) { insert_it = probe_it; }
+          if (!insert_it) { insert_it = probe; }
 
           // bucket does not contain any payload
-          ++probe_it;
+          ++probe;
           continue;
         }
       }
 
       // check if predicate is satisfied
       value_type index = policy_.get().decode(payload);
-      if (predicate(index)) { return {probe_it, found::predicate}; }
+      if (predicate(index)) { return {probe, found::predicate}; }
 
       if constexpr (!uses_tombstones) {
         // cache the end of probing range for insertion
-        if (probe_it == end && !insert_it) [[unlikely]] { insert_it = probe_it; }
+        if (probe == probing::insert_end{} && !insert_it) [[unlikely]] { insert_it = probe; }
       }
 
-      ++probe_it;
+      ++probe;
     }
+
+    // did not find what we were looking for
+    // return the insert iterator if it's set, or the current one
+    return {insert_it.value_or(probe), found::insertion};
   }
 
   friend constexpr void swap(hash_table& lhs,
