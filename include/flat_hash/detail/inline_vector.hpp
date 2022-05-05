@@ -125,7 +125,7 @@ class inline_vector {
   {
     FLAT_HASH_ASSERT(n < N, "Cannot resize to {:d} or more, got {:d}", N, n);
     while (count_ < n) { emplace_back(); }
-    while (count_ > n) { pop_back(); }
+    if (n < count_) { shrink(n); }
   }
   constexpr void resize(size_type n, T const& value) noexcept(
       std::is_nothrow_copy_constructible_v<T>&& std::is_nothrow_destructible_v<T>)
@@ -133,7 +133,7 @@ class inline_vector {
   {
     FLAT_HASH_ASSERT(n < N, "Cannot resize to {:d} or more, got {:d}", N, n);
     while (count_ < n) { emplace_back(value); }
-    while (count_ > n) { pop_back(); }
+    if (n < count_) { shrink(n); }
   }
   [[nodiscard]] constexpr auto size() const noexcept -> size_type { return count_; }
   [[nodiscard]] constexpr auto ssize() const noexcept -> difference_type {
@@ -156,10 +156,7 @@ class inline_vector {
     count_ = static_cast<size_type>(new_size);
   }
 
-  constexpr void clear() noexcept(std::is_nothrow_destructible_v<T>) {
-    containers::destroy_range(*this);
-    count_ = 0;
-  }
+  constexpr void clear() noexcept(std::is_nothrow_destructible_v<T>) { shrink(0); }
 
  private:
   // std::aligned_storage_t is deprecated in C++23
@@ -199,6 +196,14 @@ class inline_vector {
     other.count_ = 0;
 
     return *this;
+  }
+
+  constexpr void shrink(size_type n) noexcept(std::is_nothrow_destructible_v<T>) {
+    if constexpr (!std::is_trivially_destructible_v<T>) {
+      auto sn = static_cast<difference_type>(n);
+      containers::destroy_range(std::ranges::subrange(begin() + sn, end()));
+    }
+    count_ = n;
   }
 };
 }  // namespace detail
