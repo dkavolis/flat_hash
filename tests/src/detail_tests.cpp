@@ -417,6 +417,14 @@ TEST_CASE("Generic container functions", "[internal][containers]") {
     // check that long strings are also properly returned
     emplace_back(v, "some very long string");
     CHECK(pop_back_extract(v) == "some very long string");
+
+    SECTION("assigning itself has no effect") {
+      v = v;
+      CHECK_THAT(v, Equals(strings));
+
+      v = std::move(v);
+      CHECK_THAT(v, Equals(strings));
+    }
   }
 }
 

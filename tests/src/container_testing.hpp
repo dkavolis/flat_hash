@@ -116,7 +116,10 @@ void test_resize(R container, std::ranges::range_value_t<R> const& value) {
         detail::containers::resize(container, 2, value);
         vector.resize(2, value);
       }
-      WHEN("reducing the size") { inner_test(container, vector, size - 1); }
+      WHEN("reducing the size") {
+        AND_WHEN("default value resizing") { inner_test(container, vector, 1U); }
+        AND_WHEN("value resizing") { inner_test(container, vector, 1U, value); }
+      }
     }
   }
 }

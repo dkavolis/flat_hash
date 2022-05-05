@@ -57,14 +57,23 @@ template <class Key, ordering_policy Policy, probing::probing_policy Probing>
 using set = ::flat_hash::set<Key, traits<dynamic_set_traits<Key>, Policy, Probing>>;
 }
 
-#define FLAT_HASH_DYNAMIC_SET_SIGS_1(K, P) (K, ordering_policy::preserved, P), (K, ordering_policy::relaxed, P)
-#define FLAT_HASH_DYNAMIC_SET_SIGS(K)                                                                    \
-  FLAT_HASH_DYNAMIC_SET_SIGS_1(K, probing::quadratic), FLAT_HASH_DYNAMIC_SET_SIGS_1(K, probing::python), \
-      FLAT_HASH_DYNAMIC_SET_SIGS_1(K, probing::robin_hood)
+#define FLAT_HASH_SET_SIGS_1(K, P) (K, ordering_policy::preserved, P), (K, ordering_policy::relaxed, P)
+#define FLAT_HASH_SET_SIGS(K)                                                            \
+  FLAT_HASH_SET_SIGS_1(K, probing::quadratic), FLAT_HASH_SET_SIGS_1(K, probing::python), \
+      FLAT_HASH_SET_SIGS_1(K, probing::robin_hood)
+#define FLAT_HASH_DYNAMIC_SETS testing::set, testing::inline_set
+#define FLAT_HASH_STATIC_SETS testing::fixed_set
+#define FLAT_HASH_SETS FLAT_HASH_DYNAMIC_SETS, FLAT_HASH_STATIC_SETS
 
-#define FLAT_HASH_DYNAMIC_SET_TEST_CASE(Name, Tags, ...)                                             \
-  TEMPLATE_PRODUCT_TEST_CASE_SIG(Name, Tags, ((typename K, ordering_policy O, typename P), K, O, P), \
-                                 (testing::set, testing::inline_set), (FLAT_HASH_DYNAMIC_SET_SIGS(__VA_ARGS__)))
+#define FLAT_HASH_TEST_CASE_SIG(Name, Tags, Types, ...)                                                       \
+  TEMPLATE_PRODUCT_TEST_CASE_SIG(Name, Tags, ((typename K, ordering_policy O, typename P), K, O, P), (Types), \
+                                 (FLAT_HASH_SET_SIGS(__VA_ARGS__)))
+
+#define FLAT_HASH_DYNAMIC_SET_TEST_CASE(Name, Tags, ...) \
+  FLAT_HASH_TEST_CASE_SIG(Name, Tags, FLAT_HASH_DYNAMIC_SETS, __VA_ARGS__)
+#define FLAT_HASH_STATIC_SET_TEST_CASE(Name, Tags, ...) \
+  FLAT_HASH_TEST_CASE_SIG(Name, Tags, FLAT_HASH_STATIC_SETS, __VA_ARGS__)
+#define FLAT_HASH_SET_TEST_CASE(Name, Tags, ...) FLAT_HASH_TEST_CASE_SIG(Name, Tags, FLAT_HASH_SETS, __VA_ARGS__)
 
 }  // namespace testing
 
@@ -134,6 +143,13 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Dynamic sets are constructible", "[set][constru
     CHECK(s.bucket_count() >= 0);
   }
 
+  SECTION("from a bucket count") {
+    set_type s(16);
+
+    CHECK_THAT(s, Catch::Matchers::IsEmpty());
+    CHECK(s.bucket_count() >= 16);
+  }
+
   SECTION("from an initializer_list") {
     set_type s{init_a};
 
@@ -166,18 +182,6 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Dynamic sets are constructible", "[set][constru
     CHECK(s.bucket_count() == copy.bucket_count());
     CHECK(s == copy);
     CHECK_THAT(copy, Equals(s) && ContainsAllOf(init_a) && ContainsNoneOf(init_b));
-  }
-
-  SECTION("using swap") {
-    set_type a{init_a};
-    set_type b{init_b};
-
-    std::ranges::swap(a, b);
-
-    CHECK(a.size() == b.size());
-    CHECK(a.bucket_count() == b.bucket_count());
-    CHECK_THAT(a, Equals(init_b) && ContainsAllOf(init_b) && ContainsNoneOf(init_a));
-    CHECK_THAT(b, Equals(init_a) && ContainsAllOf(init_a) && ContainsNoneOf(init_b));
   }
 
   SECTION("can be assigned an initializer list") {
@@ -236,18 +240,6 @@ TEST_CASE("Fixed sets are constructible", "[set][construct][fixed]") {
     CHECK_THAT(copy, Equals(s) && ContainsAllOf(init_a) && ContainsNoneOf(init_b));
   }
 
-  SECTION("using swap") {
-    set_type a{init_a};
-    set_type b{init_b};
-
-    std::ranges::swap(a, b);
-
-    CHECK(a.size() == b.size());
-    CHECK(a.bucket_count() == b.bucket_count());
-    CHECK_THAT(a, Equals(init_b) && ContainsAllOf(init_b) && ContainsNoneOf(init_a));
-    CHECK_THAT(b, Equals(init_a) && ContainsAllOf(init_a) && ContainsNoneOf(init_b));
-  }
-
   SECTION("can be assigned an initializer list") {
     WHEN("the set is not empty") {
       set_type s{init_b};
@@ -255,6 +247,41 @@ TEST_CASE("Fixed sets are constructible", "[set][construct][fixed]") {
       CHECK_THAT(s, Equals(init_a) && ContainsAllOf(init_a) && ContainsNoneOf(init_b));
     }
   }
+}
+
+template <class Set>
+void test_swap(std::initializer_list<std::ranges::range_value_t<Set>> init_a,
+               std::initializer_list<std::ranges::range_value_t<Set>> init_b) {
+  Set a{init_a};
+
+  SECTION("swapping with another set swaps contained values") {
+    Set b{init_b};
+
+    std::ranges::swap(a, b);
+
+    CHECK_THAT(a, Equals(init_b) && ContainsAllOf(init_b) && ContainsNoneOf(init_a));
+    CHECK_THAT(b, Equals(init_a) && ContainsAllOf(init_a) && ContainsNoneOf(init_b));
+  }
+
+  SECTION("Swapping with itself has no effect") {
+    auto* ptr = std::addressof(a);
+    std::ranges::swap(a, a);
+    CHECK(std::addressof(a) == ptr);
+  }
+}
+
+FLAT_HASH_DYNAMIC_SET_TEST_CASE("sets can be swapped", "[set][swap]", int) {
+  constexpr static std::initializer_list<int> init_a = {0, 1, 2, 3};
+  constexpr static std::initializer_list<int> init_b = {4, 5, 6};
+
+  test_swap<TestType>(init_a, init_b);
+}
+
+FLAT_HASH_STATIC_SET_TEST_CASE("sets can be swapped", "[set][swap]", int) {
+  constexpr static std::initializer_list<int> init_a = {0, 1, 2, 3, 4};
+  constexpr static std::initializer_list<int> init_b = {5, 6, 7, 8, 9};
+
+  test_swap<TestType>(init_a, init_b);
 }
 
 TEST_CASE("Allocators are passed to allocator aware containers", "[set][allocator]") {
@@ -279,6 +306,15 @@ TEST_CASE("Allocators are passed to allocator aware containers", "[set][allocato
 
   CHECK(s.get_allocator().resource() == &key_resource);
   CHECK(s.get_hash_table_allocator().resource() == &index_resource);
+  CHECK(s.table().get_allocator().resource() == &index_resource);
+}
+
+TEMPLATE_TEST_CASE("set::max_size returns reasonable values", "[set][max_size]", probing::quadratic, probing::python,
+                   probing::robin_hood) {
+  testing::set<int, ordering_policy::preserved, TestType> s;
+
+  CHECK(s.max_size() < std::numeric_limits<std::uint32_t>::max());
+  CHECK(std::bit_width(s.max_size()) == 32U - s.probing().reserved_bits());
 }
 
 FLAT_HASH_DYNAMIC_SET_TEST_CASE("Set lookup tests", "[set][lookup]", std::string) {
@@ -679,13 +715,23 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::s
 
 TEST_CASE("Sets can be formatted", "[set][format]") {
   STATIC_REQUIRE(detail::formattable<int, char>);
-  dynamic_set a{{0, 1, 2, 3}};
+  dynamic_set a{0, 1, 2, 3};
 
   CHECK(FLAT_HASH_FORMAT_NS format("{}", a) == "{0, 1, 2, 3}");
+  CHECK(FLAT_HASH_FORMAT_NS format("{:}", a) == "{0, 1, 2, 3}");
+  CHECK(FLAT_HASH_FORMAT_NS format("{:l}", a) == "{\n\t0,\n\t1,\n\t2,\n\t3,\n}");
   CHECK(FLAT_HASH_FORMAT_NS format("{::d}", a) == "{0, 1, 2, 3}");
   CHECK(FLAT_HASH_FORMAT_NS format("{::02d}", a) == "{00, 01, 02, 03}");
   CHECK(FLAT_HASH_FORMAT_NS format("{:l:02d}", a) == "{\n\t00,\n\t01,\n\t02,\n\t03,\n}");
-  CHECK(FLAT_HASH_FORMAT_NS format("{:l}", a) == "{\n\t0,\n\t1,\n\t2,\n\t3,\n}");
+
+  using namespace std::literals;
+  set s = {"1"sv, "42"sv};
+
+  CHECK(FLAT_HASH_FORMAT_NS format("{}", s) == "{\"1\", \"42\"}");
+  CHECK(FLAT_HASH_FORMAT_NS format("{:}", s) == "{\"1\", \"42\"}");
+  CHECK(FLAT_HASH_FORMAT_NS format("{:l}", s) == "{\n\t\"1\",\n\t\"42\",\n}");
+  CHECK(FLAT_HASH_FORMAT_NS format("{::s}", s) == "{\"1\", \"42\"}");
+  CHECK(FLAT_HASH_FORMAT_NS format("{::>2s}", s) == "{\" 1\", \"42\"}");
 }
 
 TEST_CASE("Sets are convertible to equivalent sets", "[set][convertible]") {

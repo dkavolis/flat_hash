@@ -91,6 +91,7 @@ template <class T, class Char = char>
 concept formattable = std::is_fundamental_v<std::remove_cvref_t<T>> || has_formatter<T, std::format_context>;
 #endif
 
+// LCOV_EXCL_START
 template <class... Args>
 [[nodiscard]] auto decay_format_string(format_string<Args...> format) noexcept -> std::string_view {
 #ifdef FLAT_HASH_USE_FMTLIB
@@ -100,6 +101,7 @@ template <class... Args>
   return format;
 #endif
 }
+// LCOV_EXCL_STOP
 
 template <class Char, std::output_iterator<Char> It>
 constexpr auto write_to(It iterator, std::string_view str) -> It {
