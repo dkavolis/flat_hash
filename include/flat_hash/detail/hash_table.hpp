@@ -73,22 +73,6 @@ enum struct found {
 };
 
 /**
- * @brief An opaque value type to avoid mistakes inserting values into the wrong bucket
- *
- * @tparam T
- */
-template <class T>
-class encoded_value {
- private:
-  constexpr encoded_value(T v) noexcept : value_(v) {}
-
-  T value_;
-
-  template <index_range Container, probing::probing_policy<Container>>
-  friend class hash_table;
-};
-
-/**
  * @brief A wrapper over a container for use as a hash table
  *
  * @tparam Container A resizable random-access container of unsigned integrals
@@ -367,8 +351,8 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   }
 
   template <std::predicate<value_type> TPredicate>
-  constexpr auto find_insertion_bucket(std::uint64_t hash, TPredicate&& predicate, value_type value) const
-      -> std::pair<const_iterator, std::optional<encoded_value<value_type>>> {
+  constexpr auto find_insertion_bucket(std::uint64_t hash, TPredicate&& predicate) const
+      -> std::pair<const_iterator, std::optional<probing_iterator>> {
     auto [probe_it, return_reason] = find_if(hash, predicate);
 
     auto it = cbegin() + static_cast<difference_type>(*probe_it);
@@ -376,14 +360,14 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
       if (return_reason == found::predicate) { return {it, std::nullopt}; }
     }
 
-    return {it, encoded_value<value_type>{policy_.get().encode(value, probe_it)}};
+    return {it, probe_it};
   }
 
-  constexpr void insert(const_iterator pos, encoded_value<value_type> value) noexcept {
+  constexpr void insert(const_iterator pos, probing_iterator const& state, value_type value) noexcept {
     auto offset = pos - cbegin();
     auto it = std::ranges::begin(indices_) + offset;
-    policy_.get().pre_insert(indices_, it, value.value_);
-    *it = value.value_;
+    policy_.get().pre_insert(indices_, state);
+    *it = policy_.get().encode(value, state);
   }
 
   constexpr void clear_bucket(const_iterator pos) noexcept

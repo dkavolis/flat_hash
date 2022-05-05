@@ -67,7 +67,7 @@ concept probing_policy = std::ranges::random_access_range<R> && std::is_move_con
     { policy.encode(v, state) } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
     { policy.reencode(v, v) } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
     requires requires(T& pol, std::ranges::iterator_t<R> pos) {
-      { pol.pre_insert(container, pos, v) };
+      { pol.pre_insert(container, state) };
       { pol.post_erase(container, pos) };
     };
   });
@@ -106,9 +106,8 @@ struct basic_probing_policy {
     return v;
   }
 
-  template <std::ranges::random_access_range R>
-  constexpr void pre_insert(R const& /* r */, std::ranges::iterator_t<R const> const& /* pos */,
-                            std::ranges::range_value_t<R> /* value */) const noexcept {
+  template <std::ranges::random_access_range R, class It>
+  constexpr void pre_insert(R const& /* r */, It const& /* state */) const noexcept {
     // nothing to do
   }
   template <std::ranges::random_access_range R>
@@ -255,9 +254,9 @@ class robin_hood {
   }
 
   template <std::ranges::random_access_range R>
-  constexpr void pre_insert(R& r, std::ranges::iterator_t<R const> pos, std::ranges::range_value_t<R> value) noexcept {
+  constexpr void pre_insert(R& r, iterator<std::ranges::iterator_t<R const>> state) noexcept {
     constexpr auto empty_value = empty_bucket_v<std::ranges::range_value_t<R>>;
-    auto new_width = static_cast<std::uint8_t>(std::bit_width(decode_psl(value)));
+    auto new_width = static_cast<std::uint8_t>(std::bit_width(state.psl));
 
     if (new_width > psl_bits_) {
       // number of data bits has changed so have to reencode the entire range
@@ -268,7 +267,7 @@ class robin_hood {
       psl_bits_ = new_width;
     }
 
-    auto index = pos - std::ranges::cbegin(r);
+    auto index = static_cast<std::ranges::range_difference_t<R>>(state.index);
     auto begin = std::ranges::begin(r);
     auto it = begin + index;
 

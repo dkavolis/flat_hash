@@ -807,4 +807,50 @@ TEST_CASE("Sets are convertible to equivalent sets", "[set][convertible]") {
   }
 }
 
+struct bad_hash {
+  [[nodiscard]] constexpr auto operator()(int v) const noexcept -> std::size_t { return static_cast<std::size_t>(v); }
+};
+
+template <ordering_policy O, class P>
+struct collision_traits : dynamic_set_traits<int> {
+  constexpr static ordering_policy ordering = O;
+  using probing_policy = P;
+  using hasher = bad_hash;
+};
+
+template <class Key, ordering_policy Policy, probing::probing_policy Probing>
+using collision_set = set<Key, collision_traits<Policy, Probing>>;
+
+FLAT_HASH_TEST_CASE_SIG("Sets remain valid even with lots of collisions", "[set][collisions]", collision_set, int) {
+  typename TestType::options_type options{};
+  if constexpr (std::same_as<typename TestType::probing_policy, probing::robin_hood>) {
+    options.policy = probing::robin_hood(2);  // use small value to trigger width change
+  }
+
+  TestType s(4, options);  // construct with 4 buckets
+  REQUIRE(s.bucket_count() == 4);
+
+  constexpr static std::initializer_list<int> values = {
+      0, 8, 16, 24, 32, 40, 48, 56, 64,
+  };
+  constexpr static auto ssize = static_cast<int>(values.size());
+
+  SECTION("inserting all colliding values doesn't invalidate set state") {
+    auto offset = GENERATE(range(1, ssize));
+    auto subvalues = values | std::views::take(offset);
+    s.insert(subvalues);
+    CHECK_THAT(s, Equals(subvalues) && ContainsAllOf(subvalues));
+  }
+
+  SECTION("removing colliding values doesn't invalidate set state") {
+    auto stop = GENERATE(range(1, ssize));
+    auto start = GENERATE_COPY(range(0, stop));
+    auto subvalues = values | std::views::take(stop);
+    s.insert(subvalues);
+    s.erase(s.begin() + start, s.begin() + stop);
+
+    CHECK_THAT(s, ContainsAllOf(values | std::views::take(start)) && ContainsNoneOf(values | std::views::drop(start)));
+  }
+}
+
 FLAT_HASH_NAMESPACE_END

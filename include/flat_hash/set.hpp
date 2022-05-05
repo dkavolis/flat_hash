@@ -1319,8 +1319,8 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
   key_container keys_;
 
   constexpr void insert_key_into_table(value_type const& key, index_type index) noexcept {
-    auto [it, value] = hash_table_.find_insertion_bucket(hash_.get()(key), detail::always_false, index);
-    hash_table_.insert(it, *value);
+    auto [it, probe_state] = hash_table_.find_insertion_bucket(hash_.get()(key), detail::always_false);
+    hash_table_.insert(it, *probe_state, index);
   }
 
   constexpr auto ensure_load_factor(size_type n, bool force_rehash = false, bool strict = true) -> bool {
@@ -1362,8 +1362,8 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     index_type added = 0;
     auto out = std::ranges::begin(keys_);
     for (auto&& v : values) {
-      auto [probe, bucket_value] = hash_table_.find_insertion_bucket(hash_.get()(v), equal_predicate(v), added);
-      if (!bucket_value) [[unlikely]] { continue; }
+      auto [probe, probe_state] = hash_table_.find_insertion_bucket(hash_.get()(v), equal_predicate(v));
+      if (!probe_state) [[unlikely]] { continue; }
       if constexpr (!detail::containers::resizable<key_container>) {
         // check that we are still within the container size
         if (added == n) [[unlikely]] {  // LCOV_EXCL_LINE
@@ -1379,7 +1379,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
         *out = std::move(v);
       }
       // update table after assignment in case it throws
-      hash_table_.insert(probe, *bucket_value);
+      hash_table_.insert(probe, *probe_state, added);
       ++out;
       ++added;
     }
@@ -1401,8 +1401,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     FLAT_HASH_ASSERT(offset <= std::ranges::ssize(keys_), "Iterator past the end");
     ensure_load_factor(size() + 1);
 
-    auto [table_iterator, bucket_value] =
-        hash_table_.find_insertion_bucket(hash_.get()(key), equal_predicate(key), static_cast<index_type>(offset));
+    auto [table_iterator, probe_state] = hash_table_.find_insertion_bucket(hash_.get()(key), equal_predicate(key));
 
     auto forwarded_key = [&key]() noexcept -> decltype(auto) {
       if constexpr (Move && !std::is_const_v<K>) {
@@ -1413,19 +1412,20 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     };
 
     iterator out{};
-    if (bucket_value) {
+    auto index = static_cast<index_type>(offset);
+    if (probe_state) {
       if (pos == cend()) {
         detail::containers::emplace_back(keys_, forwarded_key());
-        hash_table_.insert(table_iterator, *bucket_value);
+        hash_table_.insert(table_iterator, *probe_state, index);
         out = std::ranges::begin(keys_) + ssize() - 1;
       } else {
         if constexpr (ordering == ordering_policy::preserved && detail::containers::insertible_to<K, key_container>) {
           out = detail::containers::policy_insert<ordering>(keys_, pos.base(), forwarded_key());
 
           // shift the indices and then insert the value
-          hash_table_.mutate_if([i = static_cast<size_type>(offset)](index_type index) noexcept { return index >= i; },
-                                [](index_type index) noexcept { return index + 1; });
-          hash_table_.insert(table_iterator, *bucket_value);
+          hash_table_.mutate_if([index](index_type i) noexcept { return i >= index; },
+                                [](index_type i) noexcept { return i + 1; });
+          hash_table_.insert(table_iterator, *probe_state, index);
         } else if constexpr (ordering == ordering_policy::relaxed) {
           auto swap_iter = find_bucket(pos);
           // may throw so do it first before updating hash table
@@ -1433,16 +1433,16 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
 
           // first modify the swapped bucket because insert may invalidate it, i.e. robin_hood probing
           hash_table_.overwrite(swap_iter, static_cast<index_type>(ssize() - 1));
-          hash_table_.insert(table_iterator, *bucket_value);
+          hash_table_.insert(table_iterator, *probe_state, index);
         } else {
           detail::containers::emplace_back(keys_, forwarded_key());
-          hash_table_.insert(table_iterator, *bucket_value);
+          hash_table_.insert(table_iterator, *probe_state, index);
           out = std::ranges::begin(keys_) + ssize() - 1;
         }
       }
     }
 
-    return {out, bucket_value.has_value()};
+    return {out, probe_state.has_value()};
   }
 
   template <detail::set_addable_key<set> K, bool Move>

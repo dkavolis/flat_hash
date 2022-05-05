@@ -76,8 +76,9 @@ template <class T1, class T2 = T1>
 concept nothrow_swappable = std::is_nothrow_swappable_with_v<T1&, T2&>;
 
 template <class T, class Key, class Hash, class KeyEq>
-concept valid_key = (std::same_as<T, Key> || (transparent_functor<Hash> && transparent_functor<KeyEq> &&
-                                              hash_for<Hash, T> && equality_comparator<KeyEq, T, Key>));
+concept valid_key = (std::same_as<std::remove_cvref_t<T>, Key> ||
+                     (transparent_functor<Hash> && transparent_functor<KeyEq> && hash_for<Hash, T> &&
+                      equality_comparator<KeyEq, T, Key>));
 
 template <class T>
 struct maybe_empty {
