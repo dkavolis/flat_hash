@@ -849,7 +849,9 @@ FLAT_HASH_TEST_CASE_SIG("Sets remain valid even with lots of collisions", "[set]
     s.insert(subvalues);
     s.erase(s.begin() + start, s.begin() + stop);
 
-    CHECK_THAT(s, ContainsAllOf(values | std::views::take(start)) && ContainsNoneOf(values | std::views::drop(start)));
+    // std::views::drop uses throwing path in GCC 11.1 which doesn't compile without exceptions
+    CHECK_THAT(s, ContainsAllOf(values | std::views::take(start)) &&
+                      ContainsNoneOf(std::ranges::subrange(values.begin() + stop, values.end())));
   }
 }
 
