@@ -40,24 +40,33 @@ struct traits : public Traits {
   using probing_policy = Probing;
 };
 
-template <class Key, ordering_policy Policy, probing::probing_policy Probing>
+template <class Key, probing::probing_policy Probing = probing::quadratic,
+          ordering_policy Policy = ordering_policy::preserved>
 using set = ::flat_hash::set<Key, traits<dynamic_set_traits<Key>, Policy, Probing>>;
 
-template <class Key, ordering_policy Policy, probing::probing_policy Probing>
+template <class Key, probing::probing_policy Probing = probing::quadratic,
+          ordering_policy Policy = ordering_policy::preserved>
 using fixed_set = ::flat_hash::set<Key, traits<fixed_set_traits<Key, 5>, Policy, Probing>>;
 
-template <class Key, ordering_policy Policy, probing::probing_policy Probing>
+template <class Key, probing::probing_policy Probing = probing::quadratic,
+          ordering_policy Policy = ordering_policy::preserved>
 using inline_set = ::flat_hash::set<Key, traits<inline_set_traits<Key, 64>, Policy, Probing>>;
 
-template <class Key, ordering_policy Policy, probing::probing_policy Probing>
+template <class Key, probing::probing_policy Probing = probing::quadratic,
+          ordering_policy Policy = ordering_policy::preserved>
 using set_view = ::flat_hash::set<Key, traits<set_view_traits<Key>, Policy, Probing>>;
 
+template <class Key, probing::probing_policy Probing = probing::quadratic,
+          ordering_policy Policy = ordering_policy::preserved>
+using fixed_set_view = ::flat_hash::set<Key, traits<set_view_traits<Key, 5>, Policy, Probing>>;
+
 namespace pmr {
-template <class Key, ordering_policy Policy, probing::probing_policy Probing>
+template <class Key, probing::probing_policy Probing = probing::quadratic,
+          ordering_policy Policy = ordering_policy::preserved>
 using set = ::flat_hash::set<Key, traits<dynamic_set_traits<Key>, Policy, Probing>>;
 }
 
-#define FLAT_HASH_SET_SIGS_1(K, P) (K, ordering_policy::preserved, P), (K, ordering_policy::relaxed, P)
+#define FLAT_HASH_SET_SIGS_1(K, P) (K, P, ordering_policy::preserved), (K, P, ordering_policy::relaxed)
 #define FLAT_HASH_SET_SIGS(K)                                                            \
   FLAT_HASH_SET_SIGS_1(K, probing::quadratic), FLAT_HASH_SET_SIGS_1(K, probing::python), \
       FLAT_HASH_SET_SIGS_1(K, probing::robin_hood)
@@ -66,7 +75,7 @@ using set = ::flat_hash::set<Key, traits<dynamic_set_traits<Key>, Policy, Probin
 #define FLAT_HASH_SETS FLAT_HASH_DYNAMIC_SETS, FLAT_HASH_STATIC_SETS
 
 #define FLAT_HASH_TEST_CASE_SIG(Name, Tags, Types, ...)                                                       \
-  TEMPLATE_PRODUCT_TEST_CASE_SIG(Name, Tags, ((typename K, ordering_policy O, typename P), K, O, P), (Types), \
+  TEMPLATE_PRODUCT_TEST_CASE_SIG(Name, Tags, ((typename K, typename P, ordering_policy O), K, P, O), (Types), \
                                  (FLAT_HASH_SET_SIGS(__VA_ARGS__)))
 
 #define FLAT_HASH_DYNAMIC_SET_TEST_CASE(Name, Tags, ...) \
@@ -77,11 +86,11 @@ using set = ::flat_hash::set<Key, traits<dynamic_set_traits<Key>, Policy, Probin
 
 }  // namespace testing
 
-using dynamic_set = flat_hash::set<int>;
-using span_set = flat_hash::set_view<int>;
-using array_set = flat_hash::fixed_set<int, 5>;
-using fixed_span_set = flat_hash::set_view<int, 5>;
-using tiny_set = flat_hash::inline_set<int, 5>;
+using dynamic_set = testing::set<int>;
+using span_set = testing::set_view<int>;
+using array_set = testing::fixed_set<int>;
+using fixed_span_set = testing::fixed_set_view<int>;
+using tiny_set = testing::inline_set<int>;
 
 template class set<int>;
 template class set<int, inline_set_traits<int, 64>>;
@@ -311,7 +320,7 @@ TEST_CASE("Allocators are passed to allocator aware containers", "[set][allocato
 
 TEMPLATE_TEST_CASE("set::max_size returns reasonable values", "[set][max_size]", probing::quadratic, probing::python,
                    probing::robin_hood) {
-  testing::set<int, ordering_policy::preserved, TestType> s;
+  testing::set<int, TestType> s;
 
   CHECK(s.max_size() < std::numeric_limits<std::uint32_t>::max());
   CHECK(std::bit_width(s.max_size()) == 32U - s.probing().reserved_bits());
@@ -390,6 +399,16 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Set lookup tests", "[set][lookup]", std::string
     auto&& key = GENERATE_COPY(from_range(extra));
     SECTION("by key_type") { CHECK(s.bucket(key) == s.bucket_count()); }
     SECTION("by compatible key") { CHECK(s.bucket(std::string_view(key)) == s.bucket_count()); }
+  }
+
+  SECTION("set::bucket_size returns 1 if key is in the set") {
+    auto&& key = GENERATE_COPY(from_range(init));
+    CHECK(s.bucket_size(s.bucket(key)) == 1);
+  }
+
+  SECTION("set::bucket_size returns 0 if key is not in the set") {
+    auto iota = std::views::iota(0U, s.bucket_count());
+    CHECK(std::ranges::count_if(iota, [&s](auto index) -> bool { return s.bucket_size(index) == 1; }) == s.ssize());
   }
 }
 
@@ -540,13 +559,19 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::s
       CHECK_THAT(a, ContainsAllOf(values) && Contains(value));
     }
 
+    SECTION("heterogeneous values with set::insert") {
+      auto [it, inserted] = a.insert(value);
+      CHECK(*it == value);
+      CHECK(inserted);
+      CHECK_THAT(it, IterEquals(a, a.begin() + a.ssize() - 1));
+      CHECK_THAT(a, ContainsAllOf(values) && Contains(value));
+    }
+
     SECTION("with set::emplace") {
       auto [it, inserted] = a.emplace(value);
       CHECK(*it == value);
       CHECK(inserted);
       CHECK_THAT(it, IterEquals(a, a.begin() + a.ssize() - 1));
-      CHECK(a.size() == values.size() + 1);
-
       CHECK_THAT(a, ContainsAllOf(values) && Contains(value));
     }
 
@@ -558,8 +583,13 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::s
         auto iter = a.insert(a.begin() + offset, std::move(str));
         CHECK(*iter == value);
         CHECK_THAT(iter, IterEquals(a, a.begin() + offset));
-        CHECK(a.size() == values.size() + 1);
+        CHECK_THAT(a, ContainsAllOf(values) && Contains(value));
+      }
 
+      SECTION("with heterogeneous set::insert") {
+        auto iter = a.insert(a.begin() + offset, value);
+        CHECK(*iter == value);
+        CHECK_THAT(iter, IterEquals(a, a.begin() + offset));
         CHECK_THAT(a, ContainsAllOf(values) && Contains(value));
       }
 
@@ -567,20 +597,29 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::s
         auto iter = a.emplace_hint(a.begin() + offset, value);
         CHECK(*iter == value);
         CHECK_THAT(iter, IterEquals(a, a.begin() + offset));
-        CHECK(a.size() == values.size() + 1);
-
         CHECK_THAT(a, ContainsAllOf(values) && Contains(value));
       }
     }
   }
 
+  SECTION("inserting contained values doesn't change the set") {
+    auto ssize = a.ssize();
+    auto& str = GENERATE_COPY(from_range(values));
+    CHECK_FALSE(a.insert(str).second);
+    CHECK_THAT(a, Equals(values));
+
+    auto offset = GENERATE_COPY(range(ssize * 0, ssize));
+    a.insert(a.begin() + offset, str);
+    CHECK_THAT(a, Equals(values));
+  }
+
   SECTION("ranges of values can be inserted") {
-    WHEN("inserting initializer_list") {
+    WHEN("from an initializer_list") {
       a.insert(extra);
       CHECK_THAT(a, ContainsAllOf(values) && ContainsAllOf(extra));
     }
 
-    WHEN("inserting pair of iterators") {
+    WHEN("from a pair of iterators") {
       a.insert(extra.begin(), extra.end());
       CHECK_THAT(a, ContainsAllOf(values) && ContainsAllOf(extra));
     }
@@ -601,40 +640,39 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::s
     }
   }
 
-  SECTION("inserting contained values doesn't change the set") {
-    auto const& i = GENERATE_COPY(from_range(values));
-    CHECK_FALSE(a.insert(i).second);
-    CHECK(a.size() == values.size());
-
-    CHECK_THAT(a, ContainsAllOf(values));
-  }
-
   SECTION("values can be removed") {
     auto const& i = GENERATE_COPY(from_range(values));
-    CHECK(a.erase(i) == 1);
-    CHECK(a.size() == values.size() - 1);
 
-    CHECK_THAT(a, !Contains(i));
-    CHECK_THAT(a, ContainsAllOf(a));
+    SECTION("with set::erase") {
+      CHECK(a.erase(i) == 1);
+      CHECK_THAT(a, ContainsAllOf(a) && !Contains(i));
+    }
+
+    SECTION("with heterogeneous set::erase") {
+      std::string_view str = i;
+      CHECK(a.erase(str) == 1);
+
+      CHECK_THAT(a, ContainsAllOf(a) && !Contains(str));
+    }
+
+    SECTION("by their iterator") {
+      auto ssize = a.ssize();
+      auto offset = GENERATE_COPY(range(ssize * 0, ssize));
+
+      auto erased = *(a.begin() + offset);
+      auto iter = a.erase(a.begin() + offset);
+      CHECK(iter == a.begin() + offset);
+      CHECK_THAT(a, ContainsAllOf(a) && !Contains(erased));
+    }
   }
 
   SECTION("removing values not in set has no effect") {
-    auto value = GENERATE_COPY(from_range(extra));
+    auto& value = GENERATE_COPY(from_range(extra));
+    CHECK(a.erase(std::string(value)) == 0);
+    CHECK_THAT(a, Equals(values));
+
     CHECK(a.erase(value) == 0);
     CHECK_THAT(a, Equals(values));
-  }
-
-  SECTION("values can be removed by their position") {
-    auto ssize = a.ssize();
-    auto offset = GENERATE_COPY(range(ssize * 0, ssize));
-
-    auto erased = *(a.begin() + offset);
-    auto iter = a.erase(a.begin() + offset);
-    CHECK(iter == a.begin() + offset);
-    CHECK(a.size() == values.size() - 1);
-
-    CHECK_THAT(a, !Contains(erased));
-    CHECK_THAT(a, ContainsAllOf(a));
   }
 
   SECTION("ranges of values can be erased") {
@@ -657,7 +695,7 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::s
   SECTION("erase_if with false predicate will not change the set") {
     constexpr static auto pred = [](std::string_view) { return false; };
     erase_if(a, pred);
-    CHECK_THAT(a, ContainsAllOf(values));
+    CHECK_THAT(a, Equals(values));
   }
 
   SECTION("sets can be cleared") {
@@ -673,7 +711,13 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::s
 
     SECTION("by key") {
       CHECK(a.extract(expected) == expected);
-      CHECK(a.size() == values.size() - 1);
+      CHECK_THAT(a, ContainsAllOf(values | std::views::filter([expected](auto&& v) { return v != expected; })) &&
+                        !Contains(expected));
+    }
+
+    SECTION("by heterogeneous key") {
+      std::string_view key = expected;
+      CHECK(a.extract(key) == expected);
       CHECK_THAT(a, ContainsAllOf(values | std::views::filter([expected](auto&& v) { return v != expected; })) &&
                         !Contains(expected));
     }
@@ -681,7 +725,6 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::s
     SECTION("by iterator") {
       // a is a copy so pos is invalid
       CHECK(a.extract(a.begin() + offset) == expected);
-      CHECK(a.size() == values.size() - 1);
       CHECK_THAT(a, ContainsAllOf(values | std::views::filter([expected](auto&& v) { return v != expected; })) &&
                         !Contains(expected));
     }
@@ -690,6 +733,7 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::s
   SECTION("sets can be merged") {
     SECTION("with other sets") {
       TestType b(extra);
+      b.insert(values);
       a.merge(b);
       CHECK(a.size() == values.size() + extra.size());
       CHECK_THAT(a, ContainsAllOf(values) && ContainsAllOf(extra));
@@ -741,6 +785,7 @@ TEST_CASE("Sets are convertible to equivalent sets", "[set][convertible]") {
   array_set array{values};
   tiny_set small{values};
   constexpr auto implicitly = [](auto& s) noexcept -> span_set { return s; };
+  constexpr auto add_const = []<class T>(T& v) noexcept -> T const& { return v; };
 
   SECTION("dynamic sets can be implicitly converted to dynamic set views") {
     WHEN("using std::vector based set") {
@@ -751,6 +796,7 @@ TEST_CASE("Sets are convertible to equivalent sets", "[set][convertible]") {
 
       span_set view = implicitly(vector);
       CHECK_THAT(view, Equals(vector) && Equals(values) && ContainsAllOf(values));
+      CHECK_THAT(implicitly(add_const(vector)), Equals(values) && ContainsAllOf(values));
     }
 
     WHEN("using inline set") {
@@ -761,6 +807,7 @@ TEST_CASE("Sets are convertible to equivalent sets", "[set][convertible]") {
 
       span_set view = implicitly(small);
       CHECK_THAT(view, Equals(small) && Equals(values) && ContainsAllOf(values));
+      CHECK_THAT(implicitly(add_const(small)), Equals(values) && ContainsAllOf(values));
     }
   }
 
@@ -773,6 +820,7 @@ TEST_CASE("Sets are convertible to equivalent sets", "[set][convertible]") {
 
       auto view = static_cast<fixed_span_set>(vector);
       CHECK_THAT(view, Equals(vector) && Equals(values) && ContainsAllOf(values));
+      CHECK_THAT(static_cast<fixed_span_set>(add_const(vector)), Equals(values) && ContainsAllOf(values));
     }
 
     WHEN("using inline set") {
@@ -783,6 +831,7 @@ TEST_CASE("Sets are convertible to equivalent sets", "[set][convertible]") {
 
       auto view = static_cast<fixed_span_set>(small);
       CHECK_THAT(view, Equals(small) && Equals(values) && ContainsAllOf(values));
+      CHECK_THAT(static_cast<fixed_span_set>(add_const(small)), Equals(values) && ContainsAllOf(values));
     }
   }
 
@@ -793,6 +842,7 @@ TEST_CASE("Sets are convertible to equivalent sets", "[set][convertible]") {
     STATIC_REQUIRE(std::convertible_to<array_set const&, span_set>);
     span_set view = implicitly(array);
     CHECK_THAT(view, Equals(array) && Equals(values) && ContainsAllOf(values));
+    CHECK_THAT(implicitly(add_const(array)), Equals(values) && ContainsAllOf(values));
   }
 
   SECTION("static sets can be implicitly converted to static set views") {
@@ -804,6 +854,7 @@ TEST_CASE("Sets are convertible to equivalent sets", "[set][convertible]") {
     constexpr auto sized_implicitly = [](auto& s) noexcept -> fixed_span_set { return s; };
     auto view = sized_implicitly(array);
     CHECK_THAT(view, Equals(array) && Equals(values) && ContainsAllOf(values));
+    CHECK_THAT(sized_implicitly(add_const(array)), Equals(values) && ContainsAllOf(values));
   }
 }
 
@@ -818,7 +869,7 @@ struct collision_traits : dynamic_set_traits<int> {
   using hasher = bad_hash;
 };
 
-template <class Key, ordering_policy Policy, probing::probing_policy Probing>
+template <class Key, probing::probing_policy Probing, ordering_policy Policy>
 using collision_set = set<Key, collision_traits<Policy, Probing>>;
 
 FLAT_HASH_TEST_CASE_SIG("Sets remain valid even with lots of collisions", "[set][collisions]", collision_set, int) {
@@ -852,6 +903,26 @@ FLAT_HASH_TEST_CASE_SIG("Sets remain valid even with lots of collisions", "[set]
     // std::views::drop uses throwing path in GCC 11.1 which doesn't compile without exceptions
     CHECK_THAT(s, ContainsAllOf(values | std::views::take(start)) &&
                       ContainsNoneOf(std::ranges::subrange(values.begin() + stop, values.end())));
+  }
+}
+
+TEMPLATE_TEST_CASE("set::rehash can be used to increase the number of buckets", "[set][rehash]", probing::quadratic,
+                   probing::python, probing::robin_hood) {
+  constexpr static std::initializer_list values = {1, 2, 3, 4, 5};
+  SECTION("std::vector sets increase the number of buckets") {
+    testing::set<int, TestType> s = values;
+    CHECK(s.bucket_count() == 8);
+    s.rehash(32);
+    CHECK(s.bucket_count() == 32);
+    CHECK_THAT(s, Equals(values));
+  }
+
+  SECTION("rehash has no observable effect on valid inline sets") {
+    testing::inline_set<int, TestType> s = values;
+    CHECK(s.bucket_count() == 128);
+    s.rehash(32);
+    CHECK(s.bucket_count() == 128);
+    CHECK_THAT(s, Equals(values));
   }
 }
 
