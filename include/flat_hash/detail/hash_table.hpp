@@ -68,9 +68,8 @@ template <std::ranges::random_access_range R, probing::probing_iterator<R> Iter>
  * @brief Reason why the probing terminated
  */
 enum struct found {
-  empty_bucket,
+  insertion,
   predicate,
-  probing_end,
 };
 
 /**
@@ -373,13 +372,16 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
     auto [probe_it, return_reason] = find_if(hash, predicate);
 
     auto it = cbegin() + static_cast<difference_type>(*probe_it);
-    if (return_reason == found::predicate) { return {it, std::nullopt}; }
+    if constexpr (!std::same_as<always_false_t, std::remove_cvref_t<TPredicate>>) {
+      if (return_reason == found::predicate) { return {it, std::nullopt}; }
+    }
 
     return {it, encoded_value<value_type>{policy_.get().encode(value, probe_it)}};
   }
 
   constexpr void insert(const_iterator pos, encoded_value<value_type> value) noexcept {
-    auto it = std::ranges::begin(indices_) + (pos - cbegin());
+    auto offset = pos - cbegin();
+    auto it = std::ranges::begin(indices_) + offset;
     policy_.get().pre_insert(indices_, it, value.value_);
     *it = value.value_;
   }
@@ -436,12 +438,11 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
       -> std::pair<probing_iterator, found> {
     auto probing_range = policy_.get().probe(indices_, hash);
     probing_iterator probe_it = std::ranges::begin(probing_range);
-    std::sentinel_for<probing_iterator> auto end = std::ranges::end(probing_range);
 
-    while (probe_it != end) {
+    while (true) {
       value_type payload = *iterator_at(indices_, probe_it);
       // predicate always returns false so there's no need to look any values matching it
-      if (payload >= tombstone) { return {probe_it, found::empty_bucket}; }
+      if (payload >= tombstone) { return {probe_it, found::insertion}; }
 
       ++probe_it;
     }
@@ -452,32 +453,29 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   template <std::predicate<value_type> Predicate>
   [[nodiscard]] constexpr auto find_if(std::uint64_t hash, Predicate& predicate) const
       -> std::pair<probing_iterator, found> {
-    // keep track of the first unused bucket in case there is no valid predicate
-    [[maybe_unused]] std::optional<probing_iterator> first_unused = std::nullopt;
+    // keep track of the insertion bucket in case there is no valid predicate
+    std::optional<probing_iterator> insert_it = std::nullopt;
 
     auto probing_range = policy_.get().probe(indices_, hash);
     probing_iterator probe_it = std::ranges::begin(probing_range);
     std::sentinel_for<probing_iterator> auto end = std::ranges::end(probing_range);
 
-    while (probe_it != end) {
+    while (true) {
       value_type payload = *iterator_at(indices_, probe_it);
 
       if (payload == npos) {
-        // empty bucket, no need to continue anymore
-        if constexpr (uses_tombstones) {
-          // return the first unused bucket just in case
-          if (first_unused) return {*first_unused, found::empty_bucket};
-        }
-        return {probe_it, found::empty_bucket};
+        // empty bucket, no need to continue anymore, did not find what we were looking for
+        // return the insert iterator if it's set, or the current one
+        return {insert_it.value_or(probe_it), found::insertion};
       }
 
       if constexpr (uses_tombstones) {
-        // cache the first unused bucket
+        // cache the first empty bucket for insertion
         if (payload == tombstone) [[unlikely]] {
-          if (!first_unused) first_unused = probe_it;
-          ++probe_it;
+          if (!insert_it) { insert_it = probe_it; }
 
           // bucket does not contain any payload
+          ++probe_it;
           continue;
         }
       }
@@ -486,13 +484,17 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
       value_type index = policy_.get().decode(payload);
       if (predicate(index)) { return {probe_it, found::predicate}; }
 
+      if constexpr (!uses_tombstones) {
+        // cache the end of probing range for insertion
+        if (probe_it == end && !insert_it) [[unlikely]] { insert_it = probe_it; }
+      }
+
       ++probe_it;
     }
-
-    return {probe_it, found::probing_end};
   }
 
-  friend constexpr void swap(hash_table& lhs, hash_table& rhs) noexcept
+  friend constexpr void swap(hash_table& lhs,
+                             hash_table& rhs) noexcept(nothrow_swappable<Container>&& nothrow_swappable<policy>)
     requires(std::is_swappable_v<Container> && std::is_swappable_v<policy>)
   {
     std::ranges::swap(lhs.indices_, rhs.indices_);

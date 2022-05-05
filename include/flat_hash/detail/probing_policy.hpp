@@ -76,7 +76,7 @@ concept probing_policy = std::ranges::random_access_range<R> && std::is_move_con
 // clang-format on
 
 /**
- * @brief Default sentinel for probing policies
+ * @brief Default sentinel for probing policies, use it to mark the slot for insertion
  */
 struct sentinel {};
 
