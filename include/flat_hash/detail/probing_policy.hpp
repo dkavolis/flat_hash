@@ -257,6 +257,8 @@ class robin_hood {
     return encode_psl(new_value, decode_psl(payload));
   }
 
+  constexpr void on_clear() noexcept { max_psl_ = 0; }
+
   template <std::ranges::random_access_range R>
   constexpr void pre_insert(R& r, iterator<std::ranges::iterator_t<R const>> state) noexcept {
     constexpr auto empty_value = empty_bucket_v<std::ranges::range_value_t<R>>;

@@ -64,6 +64,9 @@ template <std::ranges::random_access_range R, probing::probing_iterator Iter>
   }
 }
 
+template <class T>
+concept has_on_clear = requires(T& t) { t.on_clear(); };
+
 /**
  * @brief Reason why the probing terminated
  */
@@ -264,6 +267,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
 
       // do clearing after resizing since it should not throw, ensures strong exception guarantee
       std::ranges::fill_n(std::ranges::begin(indices_), static_cast<difference_type>(std::min(old_size, s)), npos);
+      if constexpr (has_on_clear<policy>) { policy_.get().on_clear(); }
       return true;
     } else {
       // cannot resize, just make sure the size is valid
@@ -301,6 +305,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
     requires mutable_range<Container>
   {
     std::ranges::fill(indices_, npos);
+    if constexpr (has_on_clear<policy>) { policy_.get().on_clear(); }
   }
 
   /**
