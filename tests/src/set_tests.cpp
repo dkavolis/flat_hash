@@ -460,13 +460,12 @@ struct ConvertibleToInt {
   [[nodiscard]] constexpr explicit operator int() const noexcept { return a + b; }
 };
 
-template <is_set Set>
-static void test_splicing(std::initializer_list<typename Set::key_type> init_a,
-                          std::initializer_list<typename Set::key_type> init_b) {
+template <is_set Set, class K>
+static void test_splicing(std::initializer_list<typename Set::key_type> init_a, std::initializer_list<K> init_b) {
   Set a = init_a;
+  Set b(init_b);
 
   SECTION("two different sets will result in an empty second set") {
-    Set b{init_b};
     a.splice(b);
 
     CHECK_THAT(a, ContainsAllOf(init_a) && ContainsAllOf(init_b));
@@ -477,8 +476,7 @@ static void test_splicing(std::initializer_list<typename Set::key_type> init_a,
     auto ssize = std::ranges::ssize(init_a);
     auto offset = GENERATE_COPY(range(0 * ssize, ssize));
     auto subvalues = std::ranges::subrange(init_a.begin(), init_a.begin() + offset);
-    Set b{subvalues};
-    b.merge(init_b);
+    b.merge(subvalues);
 
     a.splice(b);
     CHECK_THAT(a, ContainsAllOf(init_a) && ContainsAllOf(init_b));
@@ -486,57 +484,57 @@ static void test_splicing(std::initializer_list<typename Set::key_type> init_a,
   }
 }
 
-FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", int) {
-  constexpr static std::initializer_list<int> values = {-2, 8, 2, 3, 10, 5, 6, -1, 17};
-  constexpr static std::initializer_list<int> extra = {-100, -10, -5, -6};
+FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::string) {
+  using namespace std::literals;
+  static std::initializer_list<std::string> values = {"-2", "8", "2", "3", "10", "5", "6", "-1", "17"};
+  static std::initializer_list<std::string_view> extra = {"-100", "-10", "-5", "-6"};
 
   TestType a{values};
 
   SECTION("new values can be inserted") {
+    auto value = GENERATE_COPY(from_range(extra));
+    std::string str(value);
     SECTION("with set::insert") {
-      auto [it, inserted] = a.insert(9);
-      CHECK(*it == 9);
+      auto [it, inserted] = a.insert(std::move(str));
+      CHECK(*it == value);
       CHECK(inserted);
       CHECK_THAT(it, IterEquals(a, a.begin() + a.ssize() - 1));
       CHECK(a.size() == values.size() + 1);
 
-      CHECK_THAT(a, ContainsAllOf(values) && Contains(9));
+      CHECK_THAT(a, ContainsAllOf(values) && Contains(value));
     }
 
     SECTION("with set::emplace") {
-      ConvertibleToInt cv{4, 5};
-      auto [it, inserted] = a.emplace(cv);
-      CHECK(*it == 9);
+      auto [it, inserted] = a.emplace(value);
+      CHECK(*it == value);
       CHECK(inserted);
       CHECK_THAT(it, IterEquals(a, a.begin() + a.ssize() - 1));
       CHECK(a.size() == values.size() + 1);
 
-      CHECK_THAT(a, ContainsAllOf(values) && Contains(9));
-    }
-  }
-
-  SECTION("new values can be inserted at specific positions") {
-    auto ssize = a.ssize();
-    auto offset = GENERATE_COPY(range(ssize * 0, ssize));
-
-    SECTION("with set::insert") {
-      auto iter = a.insert(a.begin() + offset, 9);
-      CHECK(*iter == 9);
-      CHECK_THAT(iter, IterEquals(a, a.begin() + offset));
-      CHECK(a.size() == values.size() + 1);
-
-      CHECK_THAT(a, ContainsAllOf(values) && Contains(9));
+      CHECK_THAT(a, ContainsAllOf(values) && Contains(value));
     }
 
-    SECTION("with set::emplace_hint") {
-      ConvertibleToInt cv{4, 5};
+    SECTION("at specific positions") {
+      auto ssize = a.ssize();
+      auto offset = GENERATE_COPY(range(ssize * 0, ssize));
 
-      auto iter = a.emplace_hint(a.begin() + offset, cv);
-      CHECK(*iter == 9);
-      CHECK_THAT(iter, IterEquals(a, a.begin() + offset));
-      CHECK(a.size() == values.size() + 1);
+      SECTION("with set::insert") {
+        auto iter = a.insert(a.begin() + offset, std::move(str));
+        CHECK(*iter == value);
+        CHECK_THAT(iter, IterEquals(a, a.begin() + offset));
+        CHECK(a.size() == values.size() + 1);
 
-      CHECK_THAT(a, ContainsAllOf(values) && Contains(9));
+        CHECK_THAT(a, ContainsAllOf(values) && Contains(value));
+      }
+
+      SECTION("with set::emplace_hint") {
+        auto iter = a.emplace_hint(a.begin() + offset, value);
+        CHECK(*iter == value);
+        CHECK_THAT(iter, IterEquals(a, a.begin() + offset));
+        CHECK(a.size() == values.size() + 1);
+
+        CHECK_THAT(a, ContainsAllOf(values) && Contains(value));
+      }
     }
   }
 
@@ -568,7 +566,7 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", int) {
   }
 
   SECTION("inserting contained values doesn't change the set") {
-    auto i = GENERATE_COPY(from_range(values));
+    auto const& i = GENERATE_COPY(from_range(values));
     CHECK_FALSE(a.insert(i).second);
     CHECK(a.size() == values.size());
 
@@ -576,12 +574,18 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", int) {
   }
 
   SECTION("values can be removed") {
-    auto i = GENERATE_COPY(from_range(values));
+    auto const& i = GENERATE_COPY(from_range(values));
     CHECK(a.erase(i) == 1);
     CHECK(a.size() == values.size() - 1);
 
     CHECK_THAT(a, !Contains(i));
     CHECK_THAT(a, ContainsAllOf(a));
+  }
+
+  SECTION("removing values not in set has no effect") {
+    auto value = GENERATE_COPY(from_range(extra));
+    CHECK(a.erase(value) == 0);
+    CHECK_THAT(a, Equals(values));
   }
 
   SECTION("values can be removed by their position") {
@@ -597,10 +601,27 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", int) {
     CHECK_THAT(a, ContainsAllOf(a));
   }
 
+  SECTION("ranges of values can be erased") {
+    auto ssize = a.ssize();
+    auto start = GENERATE_COPY(range(ssize * 0, ssize));
+    auto stop = GENERATE_COPY(range(start, ssize));
+
+    auto iter = a.erase(a.cbegin() + start, a.cbegin() + stop);
+    CHECK_THAT(iter, IterEquals(a, a.begin() + start));
+    CHECK_THAT(a, ContainsAllOf(std::ranges::subrange(values.begin(), values.begin() + start)) &&
+                      ContainsAllOf(std::ranges::subrange(values.begin() + stop, values.end())));
+  }
+
   SECTION("values can be removed based on a predicate") {
-    constexpr static auto pred = [](int v) { return v % 2 == 0; };
+    constexpr static auto pred = [](std::string_view s) { return s.size() % 2 == 0; };
     erase_if(a, pred);
-    CHECK_THAT(a, ContainsAllOf(values | std::views::filter([](int v) { return !pred(v); })));
+    CHECK_THAT(a, ContainsAllOf(values | std::views::filter([](std::string_view v) { return !pred(v); })));
+  }
+
+  SECTION("erase_if with false predicate will not change the set") {
+    constexpr static auto pred = [](std::string_view) { return false; };
+    erase_if(a, pred);
+    CHECK_THAT(a, ContainsAllOf(values));
   }
 
   SECTION("sets can be cleared") {
@@ -632,7 +653,8 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", int) {
 
   SECTION("sets can be merged") {
     SECTION("with other sets") {
-      a.merge(TestType{extra});
+      TestType b(extra);
+      a.merge(b);
       CHECK(a.size() == values.size() + extra.size());
       CHECK_THAT(a, ContainsAllOf(values) && ContainsAllOf(extra));
     }
@@ -653,12 +675,6 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", int) {
   }
 
   SECTION("sets can be spliced") { test_splicing<TestType>(values, extra); }
-}
-
-FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets of non-trivial keys can be spliced", "[set][mutation][nontrivial]", std::string) {
-  std::initializer_list<std::string> a = {"1", "2", "3", "4"};
-  std::initializer_list<std::string> b = {"5", "6", "7", "8"};
-  test_splicing<TestType>(a, b);
 }
 
 TEST_CASE("Sets can be formatted", "[set][format]") {
