@@ -210,12 +210,17 @@ template <class Char, std::ranges::sized_range R, class OutputIt,
               FormatFn>
 [[nodiscard]] constexpr auto format_range(R const& r, FLAT_HASH_FORMAT_NS basic_format_context<OutputIt, Char>& context,
                                           separators const& strings, FormatFn&& format) -> OutputIt {
+  using reference_type = std::ranges::range_reference_t<R>;
+  constexpr bool string_like = std::convertible_to<reference_type, std::basic_string_view<Char>>;
   auto it = write_to<Char>(context.out(), strings.prefix);
 
   std::int64_t i = std::ranges::ssize(r);
   for (auto&& value : r) {
+    if constexpr (string_like) { *it++ = Char{'"'}; }
     context.advance_to(it);
     it = format(value, context);
+    if constexpr (string_like) { *it++ = Char{'"'}; }
+
     --i;
 
     if (i != 0) [[likely]] { it = write_to<Char>(it, strings.separator); }
