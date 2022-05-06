@@ -34,6 +34,11 @@ function(enable_coverage NAME_ TARGET)
              -fno-default-inline
              -fno-exceptions
              --coverage)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12)
+      # no need to generate info for trivial inline functions
+      target_compile_options(${TARGET} PUBLIC -ffold-simple-inlines)
+    endif()
+
     target_compile_definitions(${TARGET} PUBLIC FLAT_HASH_COVERAGE)
 
     message(STATUS "using gcov = ${GCOV}")
