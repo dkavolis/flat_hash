@@ -1522,11 +1522,9 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
       }
     }();
 
-#ifdef __cpp_exceptions
-    auto const old_ssize = static_cast<difference_type>(old_size);
+    [[maybe_unused]] auto const old_ssize = static_cast<difference_type>(old_size);
 
-    try {
-#endif
+    FLAT_HASH_TRY {
       for (auto&& value : values) {
         // guaranteed to contain unique values, only add values that are not already in this set
         if (!contains(value)) {
@@ -1539,13 +1537,12 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
       }
 
       ensure_load_factor(size());
-#ifdef __cpp_exceptions
-    } catch (...) {
+    }
+    FLAT_HASH_CATCH(...) {
       // erasing from the end is much less likely to throw if it does
       detail::containers::erase_after(keys_, std::ranges::cbegin(keys_) + old_ssize);
-      throw;
+      FLAT_HASH_THROW();
     }
-#endif
 
     // no need to rehash previous keys as values were simply placed into key container
     auto const s = static_cast<index_type>(size());

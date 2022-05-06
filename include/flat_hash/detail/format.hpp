@@ -159,7 +159,7 @@ struct range_format_options {
 #ifdef FLAT_HASH_USE_FMTLIB
 #  define FLAT_HASH_ON_FORMAT_ERROR(ctx, ...) ctx.on_error(__VA_ARGS__)
 #else
-#  define FLAT_HASH_ON_FORMAT_ERROR(ctx, ...) throw std::format_error(__VA_ARGS__)
+#  define FLAT_HASH_ON_FORMAT_ERROR(ctx, ...) FLAT_HASH_THROW(std::format_error(__VA_ARGS__))
 #endif
 
 template <class... Args>

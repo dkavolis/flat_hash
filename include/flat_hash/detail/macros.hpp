@@ -78,3 +78,13 @@
 #    define FLAT_HASH_ENABLE_ASSERTIONS
 #  endif
 #endif
+
+#ifdef __cpp_exceptions
+#  define FLAT_HASH_TRY try
+#  define FLAT_HASH_CATCH(...) catch (__VA_ARGS__)
+#  define FLAT_HASH_THROW(...) throw __VA_ARGS__
+#else
+#  define FLAT_HASH_TRY
+#  define FLAT_HASH_CATCH(...) if constexpr (false)
+#  define FLAT_HASH_THROW(...) std::abort()
+#endif
