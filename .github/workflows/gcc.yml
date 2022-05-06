@@ -81,7 +81,7 @@ jobs:
         uses: codecov/codecov-action@v2
         if: "${{ matrix.preset == 'ci-codecov' }}"
         with:
-          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          # token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
           directory: ${{ github.workspace }}/out/build/${{ matrix.preset }}/tests
           dry_run: false
           fail_ci_if_error: false
