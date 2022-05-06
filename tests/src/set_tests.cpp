@@ -602,10 +602,14 @@ FLAT_HASH_DYNAMIC_SET_TEST_CASE("Sets can be mutated", "[set][mutation]", std::s
     }
   }
 
-  SECTION("inserting contained values doesn't change the set") {
+  SECTION(
+      "inserting contained values doesn't change the set and returns the iterator to the element preventing "
+      "insertion") {
     auto ssize = a.ssize();
     auto& str = GENERATE_COPY(from_range(values));
-    CHECK_FALSE(a.insert(str).second);
+    auto [iter, inserted] = a.insert(str);
+    CHECK_FALSE(inserted);
+    CHECK(*iter == str);
     CHECK_THAT(a, Equals(values));
 
     auto offset = GENERATE_COPY(range(ssize * 0, ssize));

@@ -1440,6 +1440,8 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
           out = std::ranges::begin(keys_) + ssize() - 1;
         }
       }
+    } else {
+      out = std::ranges::begin(keys_) + static_cast<difference_type>(table_iterator.decoded());
     }
 
     return {out, probe_state.has_value()};
