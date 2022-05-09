@@ -166,7 +166,11 @@ template <std::ranges::random_access_range R>
   FLAT_HASH_ASSERT(index < std::ranges::size(container), "Index {:d} out of range for size {:d}", index,
                    std::ranges::size(container));
   if constexpr (subscriptable<R, std::ranges::range_size_t<R>>) {
+    FLAT_HASH_DIAGNOSTIC_PUSH()
+    FLAT_HASH_DIAGNOSTIC_IGNORED_CLANG_GCC("-Wsign-conversion")
+    // subrange takes in range_difference_t instead of every other container taking in range_size_t...
     return container[index];
+    FLAT_HASH_DIAGNOSTIC_POP()
   } else {
     auto offset = static_cast<std::ranges::range_difference_t<R>>(index);
     return *(std::ranges::begin(container) + offset);

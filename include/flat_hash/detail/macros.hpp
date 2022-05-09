@@ -88,3 +88,50 @@
 #  define FLAT_HASH_CATCH(...) if constexpr (false)
 #  define FLAT_HASH_THROW(...) std::abort()
 #endif
+
+#define FLAT_HASH_STRINGIFY_INTERNAL(x) #x
+#define FLAT_HASH_STRINGIFY(x) FLAT_HASH_STRINGIFY_INTERNAL(x)
+
+#if defined(__clang__)
+#  define FLAT_HASH_DIAGNOSTIC_PUSH_CLANG() _Pragma("clang diagnostic push")
+#  define FLAT_HASH_DIAGNOSTIC_POP_CLANG() _Pragma("clang diagnostic pop")
+#  define FLAT_HASH_DIAGNOSTIC_IGNORED_CLANG(_x) _Pragma(FLAT_HASH_STRINGIFY(clang diagnostic ignored _x))
+#else
+#  define FLAT_HASH_DIAGNOSTIC_PUSH_CLANG()
+#  define FLAT_HASH_DIAGNOSTIC_POP_CLANG()
+#  define FLAT_HASH_DIAGNOSTIC_IGNORED_CLANG(_x)
+#endif
+
+#if defined(__GNUC__)
+#  define FLAT_HASH_DIAGNOSTIC_PUSH_GCC() _Pragma("GCC diagnostic push")
+#  define FLAT_HASH_DIAGNOSTIC_POP_GCC() _Pragma("GCC diagnostic pop")
+#  define FLAT_HASH_DIAGNOSTIC_IGNORED_GCC(_x) _Pragma(FLAT_HASH_STRINGIFY(GCC diagnostic ignored _x))
+#else
+#  define FLAT_HASH_DIAGNOSTIC_PUSH_GCC()
+#  define FLAT_HASH_DIAGNOSTIC_POP_GCC()
+#  define FLAT_HASH_DIAGNOSTIC_IGNORED_GCC(_x)
+#endif
+
+#if defined(_MSC_VER)
+#  define FLAT_HASH_DIAGNOSTIC_PUSH_MSVC() __pragma(warning(push))
+#  define FLAT_HASH_DIAGNOSTIC_POP_MSVC() __pragma(warning(pop))
+#  define FLAT_HASH_DIAGNOSTIC_IGNORED_MSVC(_x) __pragma(warning(disable : _x))
+#else
+#  define FLAT_HASH_DIAGNOSTIC_PUSH_MSVC()
+#  define FLAT_HASH_DIAGNOSTIC_POP_MSVC()
+#  define FLAT_HASH_DIAGNOSTIC_IGNORED_MSVC(_x)
+#endif
+
+#if defined(__clang__)
+#  define FLAT_HASH_DIAGNOSTIC_PUSH FLAT_HASH_DIAGNOSTIC_PUSH_CLANG
+#  define FLAT_HASH_DIAGNOSTIC_POP FLAT_HASH_DIAGNOSTIC_POP_CLANG
+#  define FLAT_HASH_DIAGNOSTIC_IGNORED_CLANG_GCC FLAT_HASH_DIAGNOSTIC_IGNORED_CLANG
+#elif defined(__GNUC__)
+#  define FLAT_HASH_DIAGNOSTIC_PUSH FLAT_HASH_DIAGNOSTIC_PUSH_GCC
+#  define FLAT_HASH_DIAGNOSTIC_POP FLAT_HASH_DIAGNOSTIC_POP_GCC
+#  define FLAT_HASH_DIAGNOSTIC_IGNORED_CLANG_GCC FLAT_HASH_DIAGNOSTIC_IGNORED_GCC
+#elif defined(_MSC_VER)
+#  define FLAT_HASH_DIAGNOSTIC_PUSH FLAT_HASH_DIAGNOSTIC_PUSH_MSVC
+#  define FLAT_HASH_DIAGNOSTIC_POP FLAT_HASH_DIAGNOSTIC_POP_MSVC
+#  define FLAT_HASH_DIAGNOSTIC_IGNORED_CLANG_GCC(_x)
+#endif
