@@ -189,10 +189,9 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
    *
    * @param container index container, size of non-resizable containers must be a power of two
    */
-  constexpr explicit hash_table(Container container,
-                                policy p = policy()) noexcept((std::is_nothrow_move_constructible_v<Container> &&
-                                                               std::is_nothrow_move_constructible_v<Policy>))
-    requires(std::is_move_constructible_v<Container> && std::is_move_constructible_v<Policy>)
+  constexpr explicit hash_table(Container container, policy p = policy()) noexcept(
+      std::is_nothrow_move_constructible_v<Container>&& std::is_nothrow_move_constructible_v<Policy>)
+    requires std::is_move_constructible_v<Container> && std::is_move_constructible_v<Policy>
   : indices_(std::move(container)), policy_(std::move(p)) {
     // make sure the size is a power of two
     resize_at_least(bucket_count());
@@ -205,7 +204,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
    */
   constexpr explicit hash_table(std::uint64_t buckets, policy p = policy(),
                                 optional_allocator<Container> const& allocator = optional_allocator<Container>())
-    requires(containers::sized_constructible<Container> && std::is_move_constructible_v<Policy>)
+    requires containers::sized_constructible<Container> && std::is_move_constructible_v<Policy>
   : indices_(containers::make_container<Container>(std::bit_ceil(buckets), npos, allocator)), policy_(std::move(p)) {}
 
   /**
@@ -225,13 +224,13 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   }
 
   template <class C>
-    requires(std::same_as<std::ranges::range_value_t<C>, value_type> && std::constructible_from<Container, C>)
+    requires(std::same_as<std::ranges::range_value_t<C>, value_type> && std::constructible_from<Container, C&>)
   constexpr explicit(!std::convertible_to<C, Container>)
       hash_table(hash_table<C, Policy>& other) noexcept((std::is_nothrow_constructible_v<Container, C&> &&
                                                          std::is_nothrow_copy_constructible_v<Policy>))
       : indices_(other.indices_), policy_(other.policy_) {}
   template <class C>
-    requires(std::same_as<std::ranges::range_value_t<C>, value_type> && std::constructible_from<Container, C const>)
+    requires(std::same_as<std::ranges::range_value_t<C>, value_type> && std::constructible_from<Container, C const&>)
   constexpr explicit(!std::convertible_to<C const, Container>)
       hash_table(hash_table<C, Policy> const& other) noexcept((std::is_nothrow_constructible_v<Container, C const&> &&
                                                                std::is_nothrow_copy_constructible_v<Policy>))
@@ -485,7 +484,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
 
   friend constexpr void swap(hash_table& lhs,
                              hash_table& rhs) noexcept(nothrow_swappable<Container>&& nothrow_swappable<policy>)
-    requires(std::is_swappable_v<Container> && std::is_swappable_v<policy>)
+    requires std::is_swappable_v<Container> && std::is_swappable_v<policy>
   {
     std::ranges::swap(lhs.indices_, rhs.indices_);
     std::ranges::swap(lhs.policy_, rhs.policy_);

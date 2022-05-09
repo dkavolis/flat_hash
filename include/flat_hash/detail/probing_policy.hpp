@@ -48,15 +48,17 @@ concept probing_end_type =
     std::same_as<insert_end, std::remove_cvref_t<T>> || std::same_as<lookup_end, std::remove_cvref_t<T>>;
 
 template <class T>
-concept probing_iterator = std::input_iterator<T> && requires(T it) {
-  { *it } -> std::integral;
-} && detail::weakly_equality_comparable_with<T, insert_end> && detail::weakly_equality_comparable_with<T, lookup_end>;
+concept probing_iterator = std::input_iterator<T> &&
+                           requires(T it) {
+                             { *it } -> std::integral;
+                           } && detail::weakly_equality_comparable_with<T, insert_end> &&
+                           detail::weakly_equality_comparable_with<T, lookup_end>;
 
 template <class T, class R>
-concept prober_for = std::ranges::random_access_range<R> &&
-    requires(T const& policy, R const& range, std::uint64_t hash) {
-  { policy.probe(range, hash) } -> probing_iterator;
-};
+concept prober_for =
+    std::ranges::random_access_range<R> && requires(T const& policy, R const& range, std::uint64_t hash) {
+                                             { policy.probe(range, hash) } -> probing_iterator;
+                                           };
 
 template <class T, std::ranges::random_access_range R>
   requires prober_for<T, R>
@@ -69,11 +71,11 @@ using iterator_t = decltype(std::declval<T const&>().probe(std::declval<R&>(), 0
 struct empty_probing_info {};
 
 template <class T, class R>
-concept probing_info_decayable = prober_for<T, R> && requires {
-  typename T::probing_info;
-  requires std::convertible_to < iterator_t<T, R>,
-  typename T::probing_info > ;
-};
+concept probing_info_decayable =
+    prober_for<T, R> && requires {
+                          typename T::probing_info;
+                          requires std::convertible_to<iterator_t<T, R>, typename T::probing_info>;
+                        };
 
 template <class T, class R>
 struct probing_info_type;
@@ -93,27 +95,28 @@ template <class T, class R>
 using probing_info_t = probing_info_type<T, R>::type;
 
 template <class T, class R = std::vector<std::uint32_t>>
-concept probing_policy = std::semiregular<T> && prober_for<T, R> && requires(T const& policy, std::uint64_t hash) {
-  { policy.reserved_bits() }
-  noexcept->std::unsigned_integral;
-  { policy.max_load_factor() }
-  noexcept->std::floating_point;
-  requires requires(std::ranges::range_value_t<R> payload) {
-    { policy.decode(payload) }
-    noexcept->std::same_as<std::ranges::range_value_t<R>>;
-  };
-  // immutable ranges don't need encode/replace and pre_insert/post_erase
-  requires(!detail::mutable_range<R> || requires(std::ranges::range_value_t<R> v, probing_info_t<T, R> info) {
-    { policy.encode(v, info) }
-    noexcept->std::same_as<std::ranges::range_value_t<R>>;
-    { policy.reencode(v, v) }
-    noexcept->std::same_as<std::ranges::range_value_t<R>>;
-    requires requires(T & pol, R & container, std::ranges::iterator_t<R const> pos) {
-      {pol.pre_insert(container, info)};
-      {pol.post_erase(container, pos)};
-    };
-  });
-};
+concept probing_policy = std::semiregular<T> && prober_for<T, R> &&
+                         requires(T const& policy, std::uint64_t hash) {
+                           { policy.reserved_bits() } noexcept -> std::unsigned_integral;
+                           { policy.max_load_factor() } noexcept -> std::floating_point;
+                           requires requires(std::ranges::range_value_t<R> payload) {
+                                      {
+                                        policy.decode(payload)
+                                        } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
+                                    };
+                           // immutable ranges don't need encode/replace and pre_insert/post_erase
+                           requires(!detail::mutable_range<R> ||
+                                    requires(std::ranges::range_value_t<R> v, probing_info_t<T, R> info) {
+                                      {
+                                        policy.encode(v, info)
+                                        } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
+                                      { policy.reencode(v, v) } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
+                                      requires requires(T & pol, R & container, std::ranges::iterator_t<R const> pos) {
+                                                 { pol.pre_insert(container, info) };
+                                                 { pol.post_erase(container, pos) };
+                                               };
+                                    });
+                         };
 
 /**
  * @brief Disable tombstones if your probing policy takes care of empty slots on removal
