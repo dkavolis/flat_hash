@@ -29,7 +29,7 @@
 
 #include "detail/bits.hpp"
 #include "detail/containers.hpp"
-#include "detail/hash_table.hpp"
+#include "detail/hash_container_base.hpp"
 #include "set_fwd.hpp"
 #include "set_traits.hpp"
 
@@ -103,24 +103,17 @@ concept reservable_set = is_set<Set> && containers::reservable<typename Set::key
 template <class Set>
 concept default_constructible_set = (is_set<Set> && !static_sized<typename Set::key_container>);
 
-/**
- * @brief Helper function for computing the lowest number of buckets for specified load_factor
- *
- * @tparam U
- * @tparam UI
- * @param n number of elements
- * @param load_factor desired maximum load factor
- * @return U lowest number of buckets for holding n elements with at most load_factor
- */
-template <std::integral U = default_index_type, std::unsigned_integral UI>
-[[nodiscard]] constexpr auto at_least(UI n, double load_factor) noexcept -> U {
-  return static_cast<U>(std::ceil(static_cast<double>(n) / load_factor));
-}
-
 template <class Set, template <class> class Trait>
-concept set_apply = Trait<typename Set::traits_type>::value && Trait<typename Set::hasher>::value &&
-                    Trait<typename Set::key_equal>::value && Trait<typename Set::hash_table>::value &&
-                    Trait<typename Set::key_container>::value;
+concept set_apply =
+    is_set<Set> && conjunction<Trait, typename Set::base, typename Set::key_container, typename Set::traits_type>;
+
+template <class Set>
+concept swappable_set = is_set<Set> && swappable<typename Set::traits_type> && swappable<typename Set::base> &&
+                        swappable<typename Set::key_container>;
+
+template <class Set>
+concept nothrow_swappable_set = is_set<Set> && nothrow_swappable<typename Set::traits_type> &&
+                                nothrow_swappable<typename Set::base> && nothrow_swappable<typename Set::key_container>;
 }  // namespace detail
 
 template <std::random_access_iterator Iter>
@@ -207,27 +200,31 @@ struct set_init {
 };
 
 template <class Key, set_traits_for<Key> Traits>
-class set : public detail::containers::maybe_enable_allocator_type<typename Traits::key_container> {
+class set : private detail::hash_container_base<typename Traits::index_container, typename Traits::probing_policy,
+                                                typename Traits::hasher, typename Traits::key_equal>,
+            public detail::containers::maybe_enable_allocator_type<typename Traits::key_container> {
   template <class K, set_traits_for<K> T>
   friend class set;
 
  public:
+  using base = detail::hash_container_base<typename Traits::index_container, typename Traits::probing_policy,
+                                           typename Traits::hasher, typename Traits::key_equal>;
   using traits_type = Traits;
   using options_type = set_init<traits_type>;
-  using index_container = Traits::index_container;
+  using index_container = base::index_container;
   using key_container = Traits::key_container;
-  using probing_policy = Traits::probing_policy;
-  using hash_table = detail::hash_table<index_container, probing_policy>;
-  using index_type = hash_table::value_type;
+  using probing_policy = base::probing_policy;
+  using hash_table = base::hash_table_type;
+  using index_type = base::value_type;
   constexpr static ordering_policy ordering = Traits::ordering;
 
   using key_type = Key;
   using value_type = Key;
   using size_type = std::uint64_t;
   using difference_type = std::int64_t;
-  using hasher = Traits::hasher;
-  using key_equal = Traits::key_equal;
-  using hash_type = decltype(hasher{}(std::declval<key_type const&>()));
+  using hasher = base::hasher;
+  using key_equal = base::key_equal;
+  using hash_type = base::template hash_type<Key>;
   // allocator_type...
   // keys are not mutable
   using iterator = set_iterator<std::ranges::iterator_t<key_container const>>;
@@ -252,11 +249,9 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    */
   constexpr explicit set(set_init<Traits> init)
     requires(detail::default_constructible_set<set>)
-  : traits_(std::move(init.traits)),
-    hash_(init.hash_function),
-    key_eq_(init.key_eq),
-    hash_table_(0, std::move(init.policy), init.index_allocator),
-    keys_(detail::containers::make_container<key_container>(0, init.key_allocator)) {
+  : base(0, init.policy, init.index_allocator, init.hash_function, init.key_eq),
+    keys_(detail::containers::make_container<key_container>(0, init.key_allocator)),
+    traits_(std::move(init.traits)) {
     FLAT_HASH_ASSERT(empty(), "set is not empty: {}", detail::maybe_format_arg(*this));
   }
 
@@ -269,14 +264,11 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    */
   constexpr explicit set(size_type bucket_count, set_init<Traits> init = set_init<Traits>())
     requires(std::constructible_from<hash_table, size_type> && !detail::static_sized<key_container>)
-  : traits_(std::move(init.traits)),
-    hash_(init.hash_function),
-    key_eq_(init.key_eq),
-    hash_table_(bucket_count, std::move(init.policy), init.index_allocator),
-    keys_(detail::containers::make_container<key_container>(0, init.key_allocator)) {
+  : base(bucket_count, init.policy, init.index_allocator, init.hash_function, init.key_eq),
+    keys_(detail::containers::make_container<key_container>(0, init.key_allocator)),
+    traits_(std::move(init.traits)) {
     if constexpr (detail::containers::reservable<key_container>) {
-      detail::containers::reserve(
-          keys_, static_cast<size_type>(max_load_factor() * static_cast<double>(this->bucket_count())));
+      detail::containers::reserve(keys_, base::supported_keys_capacity());
     }
     FLAT_HASH_ASSERT(empty(), "set is not empty: {}", detail::maybe_format_arg(*this));
   }
@@ -289,12 +281,10 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    */
   constexpr set(std::initializer_list<Key> ilist, set_init<Traits> init = set_init<Traits>())
     requires(detail::mutable_range<index_container>)
-  : traits_(std::move(init.traits)),
-    hash_(init.hash_function),
-    key_eq_(init.key_eq),
-    hash_table_(detail::at_least<size_type>(ilist.size(), init.policy.max_load_factor()), std::move(init.policy),
-                init.index_allocator),
-    keys_(detail::containers::make_container<key_container>(0, init.key_allocator)) {
+  : base(detail::at_least<size_type>(ilist.size(), init.policy.max_load_factor()), init.policy, init.index_allocator,
+         init.hash_function, init.key_eq),
+    keys_(detail::containers::make_container<key_container>(0, init.key_allocator)),
+    traits_(std::move(init.traits)) {
     if constexpr (detail::containers::back_emplaceable<key_container, Key>) {
       merge(ilist);
     } else {
@@ -314,13 +304,11 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     requires(std::constructible_from<Key, std::ranges::range_value_t<R>> && detail::mutable_range<index_container> &&
              !std::same_as<set, std::remove_cvref_t<R>>)
   constexpr explicit set(R&& r, set_init<Traits> init = set_init<Traits>())
-      : traits_(std::move(init.traits)),
-        hash_(init.hash_function),
-        key_eq_(init.key_eq),
-        hash_table_(detail::at_least<size_type>(detail::containers::size_hint_or(r, hash_table::default_size / 2),
-                                                init.policy.max_load_factor()),
-                    std::move(init.policy), init.index_allocator),
-        keys_(detail::containers::make_container<key_container>(0, init.key_allocator)) {
+      : base(detail::at_least<size_type>(detail::containers::size_hint_or(r, hash_table::default_size / 2),
+                                         init.policy.max_load_factor()),
+             init.policy, init.index_allocator, init.hash_function, init.key_eq),
+        keys_(detail::containers::make_container<key_container>(0, init.key_allocator)),
+        traits_(std::move(init.traits)) {
     if constexpr (detail::containers::back_emplaceable<key_container, std::ranges::range_value_t<R>>) {
       merge(std::forward<R>(r));
     } else {
@@ -345,22 +333,14 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
   template <class T>
     requires(same_lookup_as<Traits, T> && !std::same_as<T, Traits> &&
              std::constructible_from<key_container, typename T::key_container&> &&
-             std::constructible_from<hash_table, typename set<Key, T>::hash_table&> &&
-             std::constructible_from<hasher, typename T::hasher&> &&
-             std::constructible_from<key_equal, typename T::key_equal&>)
+             std::constructible_from<base, typename set<Key, T>::base&>)
   constexpr explicit(!(std::convertible_to<typename T::key_container&, key_container> &&
-                       std::convertible_to<typename set<Key, T>::hash_table&, hash_table>))
-      set(set<Key, T>& other, Traits t = Traits()) noexcept(
-          (std::is_nothrow_move_constructible_v<Traits> &&
-           std::is_nothrow_constructible_v<key_container, typename T::key_container&> &&
-           std::is_nothrow_constructible_v<hash_table, typename set<Key, T>::hash_table&> &&
-           std::is_nothrow_constructible_v<hasher, typename T::hasher&> &&
-           std::is_nothrow_constructible_v<key_equal, typename T::key_equal&>))
-      : traits_(std::move(t)),
-        hash_(other.hash_),
-        key_eq_(other.key_eq_),
-        hash_table_(other.hash_table_),
-        keys_(other.keys_) {}
+                       std::convertible_to<typename set<Key, T>::base&, base>))
+      set(set<Key, T>& other,
+          Traits t = Traits()) noexcept((std::is_nothrow_move_constructible_v<Traits> &&
+                                         std::is_nothrow_constructible_v<key_container, typename T::key_container&> &&
+                                         std::is_nothrow_constructible_v<base, typename set<Key, T>::base&>))
+      : base(other), keys_(other.keys_), traits_(std::move(t)) {}
 
   /**
    * @copydoc set::set(set<Key,T>&, Traits)
@@ -368,22 +348,14 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
   template <class T>
     requires(same_lookup_as<Traits, T> && !std::same_as<T, Traits> &&
              std::constructible_from<key_container, typename T::key_container const&> &&
-             std::constructible_from<hash_table, typename set<Key, T>::hash_table const&> &&
-             std::constructible_from<hasher, typename T::hasher const&> &&
-             std::constructible_from<key_equal, typename T::key_equal const&>)
+             std::constructible_from<base, typename set<Key, T>::base const&>)
   constexpr explicit(!(std::convertible_to<typename T::key_container const&, key_container> &&
-                       std::convertible_to<typename set<Key, T>::hash_table const&, hash_table>))
+                       std::convertible_to<typename set<Key, T>::base const&, base>))
       set(set<Key, T> const& other, Traits t = Traits()) noexcept(
           (std::is_nothrow_move_constructible_v<Traits> &&
            std::is_nothrow_constructible_v<key_container, typename T::key_container const&> &&
-           std::is_nothrow_constructible_v<hash_table, typename set<Key, T>::hash_table const&> &&
-           std::is_nothrow_constructible_v<hasher, typename T::hasher const&> &&
-           std::is_nothrow_constructible_v<key_equal, typename T::key_equal const&>))
-      : traits_(std::move(t)),
-        hash_(other.hash_),
-        key_eq_(other.key_eq_),
-        hash_table_(other.hash_table_),
-        keys_(other.keys_) {}
+           std::is_nothrow_constructible_v<base, typename set<Key, T>::base const&>))
+      : base(other), keys_(other.keys_), traits_(std::move(t)) {}
 
   /**
    * @brief Default copy constructor
@@ -434,7 +406,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
       merge(values);
     } else {
       // static set, cannot be empty
-      hash_table_.clear();
+      base::clear();
       assign(values);
     }
     return *this;
@@ -457,11 +429,10 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    *
    */
   [[nodiscard]] constexpr auto get_hash_table_allocator() const
-      noexcept(detail::containers::nothrow_gettable_allocator<index_container>)
-          -> detail::containers::allocator_t<hash_table>
-    requires(detail::containers::gettable_allocator<index_container>)
+      noexcept(detail::containers::nothrow_gettable_allocator<base>) -> detail::containers::allocator_t<base>
+    requires(detail::containers::gettable_allocator<base>)
   {
-    return hash_table_.get_allocator();
+    return base::get_allocator();
   }
 
   // Iterators, keys are immutable
@@ -525,12 +496,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    *
    * @return size_type
    */
-  [[nodiscard]] constexpr auto max_size() const noexcept -> size_type {
-    auto [reserved_values, reserved_bits] = hash_table_.reserved();
-    constexpr auto indexing_bytes = static_cast<std::uint8_t>(std::min(sizeof(hash_type), sizeof(index_type)));
-
-    return (size_type{1} << (indexing_bytes * CHAR_BIT - reserved_bits)) - reserved_values;
-  }
+  [[nodiscard]] constexpr auto max_size() const noexcept -> size_type { return base::template max_keys<key_type>(); }
 
   // Modifiers
 
@@ -544,7 +510,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     // hash_table may not use dynamic container but that doesn't matter
     if (empty()) { return; }
     detail::containers::clear(keys_);
-    hash_table_.clear();
+    base::clear();
   }
 
   /**
@@ -556,14 +522,14 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * inserted and false otherwise
    */
   constexpr auto try_insert(const_iterator pos, key_type&& key) -> std::pair<iterator, bool> {
-    return try_insert_impl(pos, key, std::true_type{});
+    return try_insert_impl(pos, std::move(key));
   }
 
   /**
    * @copydoc set::try_insert(const_iterator, key_type&&)
    */
   constexpr auto try_insert(const_iterator pos, key_type const& key) -> std::pair<iterator, bool> {
-    return try_insert_impl(pos, key, std::false_type{});
+    return try_insert_impl(pos, key);
   }
 
   /**
@@ -573,7 +539,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    */
   template <detail::set_addable_key<set> K>
   constexpr auto try_insert(const_iterator pos, K&& key) -> std::pair<iterator, bool> {
-    return try_insert_impl(pos, key, std::bool_constant<!std::is_lvalue_reference_v<K>>{});
+    return try_insert_impl(pos, std::forward<K>(key));
   }
 
   /**
@@ -584,16 +550,12 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * @param key value to insert
    * @return iterator Iterator to the inserted value or the element preventing insertion
    */
-  constexpr auto insert(const_iterator pos, key_type&& key) -> iterator {
-    return insert_impl(pos, key, std::true_type{});
-  }
+  constexpr auto insert(const_iterator pos, key_type&& key) -> iterator { return insert_impl(pos, std::move(key)); }
 
   /**
    * @copydoc set::insert(const_iterator, key_type&&)
    */
-  constexpr auto insert(const_iterator pos, key_type const& key) -> iterator {
-    return insert_impl(pos, key, std::false_type{});
-  }
+  constexpr auto insert(const_iterator pos, key_type const& key) -> iterator { return insert_impl(pos, key); }
 
   /**
    * @copybrief set::insert(const_iterator, key_type&&)
@@ -603,7 +565,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    */
   template <detail::set_addable_key<set> K>
   constexpr auto insert(const_iterator pos, K&& key) -> iterator {
-    return insert_impl(pos, key, std::bool_constant<!std::is_lvalue_reference_v<K>>{});
+    return insert_impl(pos, std::forward<K>(key));
   }
 
   /**
@@ -798,19 +760,13 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * @brief Swap two sets.
    *
    */
-  constexpr void swap(set& rhs) noexcept((detail::nothrow_swappable<Traits> && detail::nothrow_swappable<hasher> &&
-                                          detail::nothrow_swappable<key_equal> &&
-                                          detail::nothrow_swappable<hash_table> &&
-                                          detail::nothrow_swappable<key_container>))
-    requires(detail::swappable<Traits> && detail::swappable<hasher> && detail::swappable<key_equal> &&
-             detail::swappable<hash_table> && detail::swappable<key_container>)
+  constexpr void swap(set& rhs) noexcept(detail::nothrow_swappable_set<set>)
+    requires detail::swappable_set<set>
   {
     if (this == &rhs) [[unlikely]] { return; }
-    std::ranges::swap(traits_, rhs.traits_);
-    std::ranges::swap(hash_, rhs.hash_);
-    std::ranges::swap(key_eq_, rhs.key_eq_);
-    std::ranges::swap(hash_table_, rhs.hash_table_);
+    base::swap(rhs);
     std::ranges::swap(keys_, rhs.keys_);
+    std::ranges::swap(traits_, rhs.traits_);
   }
 
   /**
@@ -822,8 +778,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    */
   template <detail::set_removable_key<set> K>
   constexpr auto extract(K const& key) -> std::optional<value_type> {
-    auto bucket_iterator = find_bucket(key);
-    return extract_impl(bucket_iterator);
+    return extract_impl(key);
   }
 
   /**
@@ -836,10 +791,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     requires detail::set_removable_key<value_type, set>
   {
     FLAT_HASH_ASSERT(pos != cend());
-    auto bucket_iterator = find_bucket(pos);
-
-    // if pos is valid it will always have value
-    return extract_impl(bucket_iterator).value();
+    return extract_impl(pos);
   }
 
   /**
@@ -874,7 +826,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
   constexpr void splice(set<K, T>& other) {
     try_reserve_for(other);
     // private method exposes mutable key values
-    other.erase_if([this](K& key) { return try_insert_impl(cend(), key, std::true_type{}).second; }, true);
+    other.erase_if([this](K& key) { return try_insert_impl(cend(), std::move(key)).second; }, true);
   }
 
   /**
@@ -887,7 +839,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
   constexpr void splice(set<K, T>&& other) {
     try_reserve_for(other);
     // consuming, so no need to update the hash_table
-    other.erase_if([this](K& key) { return try_insert_impl(cend(), key, std::true_type{}).second; }, false);
+    other.erase_if([this](K& key) { return try_insert_impl(cend(), std::move(key)).second; }, false);
   }
 
   // Lookup
@@ -938,8 +890,8 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * @return const_iterator iterator to the element with key value or end otherwise
    */
   [[nodiscard]] constexpr auto find(key_type const& key) const noexcept -> const_iterator {
-    auto bucket = find_bucket(key);
-    if (bucket != hash_table_.end()) { return begin() + static_cast<difference_type>(*bucket); }
+    auto bucket = base::find_in(key, keys_);
+    if (bucket != base::end()) { return begin() + static_cast<difference_type>(*bucket); }
     return end();
   }
 
@@ -951,8 +903,8 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    */
   template <detail::set_lookup_key<set> K>
   [[nodiscard]] constexpr auto find(K const& key) const noexcept -> const_iterator {
-    auto bucket = find_bucket(key);
-    if (bucket != hash_table_.end()) { return begin() + static_cast<difference_type>(*bucket); }
+    auto bucket = base::find_in(key, keys_);
+    if (bucket != base::end()) { return begin() + static_cast<difference_type>(*bucket); }
     return end();
   }
 
@@ -990,7 +942,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    *
    * @return size_type
    */
-  [[nodiscard]] constexpr auto bucket_count() const noexcept -> size_type { return hash_table_.bucket_count(); }
+  [[nodiscard]] constexpr auto bucket_count() const noexcept -> size_type { return base::bucket_count(); }
 
   /**
    * @brief Maximum number of buckets dependant on the hash type, system limits are ignored
@@ -998,7 +950,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * @return size_type
    */
   [[nodiscard]] constexpr auto max_bucket_count() const noexcept -> size_type {
-    return static_cast<size_type>(std::numeric_limits<hash_type>::max());
+    return base::template max_bucket_count<key_type>();
   }
 
   /**
@@ -1009,7 +961,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    */
   [[nodiscard]] constexpr auto bucket_size(size_type bucket) const noexcept -> size_type {
     FLAT_HASH_ASSERT(bucket < bucket_count());
-    return (hash_table_.begin() + static_cast<hash_table::difference_type>(bucket)).holds_value() ? 1 : 0;
+    return (base::begin() + static_cast<base::difference_type>(bucket)).holds_value() ? 1 : 0;
   }
 
   /**
@@ -1019,7 +971,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * @return size_type index to the hash table bucket
    */
   [[nodiscard]] constexpr auto bucket(key_type const& key) const noexcept -> size_type {
-    return static_cast<size_type>(find_bucket(key) - hash_table_.begin());
+    return static_cast<size_type>(base::find_in(key, keys_) - base::begin());
   }
 
   /**
@@ -1030,25 +982,23 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    */
   template <detail::set_lookup_key<set> K>
   [[nodiscard]] constexpr auto bucket(K const& key) const noexcept -> size_type {
-    return static_cast<size_type>(find_bucket(key) - hash_table_.begin());
+    return static_cast<size_type>(base::find_in(key, keys_) - base::begin());
   }
 
   // Hash policy
   /**
    * @brief Current load factor
    *
-   * @return double
+   * @return float
    */
-  [[nodiscard]] constexpr auto load_factor() const noexcept -> double { return calc_load_factor(size()); }
+  [[nodiscard]] constexpr auto load_factor() const noexcept -> float { return base::load_factor(size()); }
 
   /**
    * @brief Maximum load factor
    *
-   * @return double
+   * @return float
    */
-  [[nodiscard]] constexpr auto max_load_factor() const noexcept -> double {
-    return static_cast<double>(hash_table_.probing_policy().max_load_factor());
-  }
+  [[nodiscard]] constexpr auto max_load_factor() const noexcept -> float { return base::max_load_factor(); }
 
   /**
    * @brief Set the number of buckets and rehash the table. count = 0 will force rehash the table without changing the
@@ -1059,19 +1009,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
   constexpr void rehash(size_type count)
     requires detail::mutable_range<index_container>
   {
-    if (count != 0) {
-      FLAT_HASH_ASSERT(static_cast<size_type>(static_cast<double>(count) * max_load_factor()) > size(),
-                       "Too few buckets to hold {:d} keys", size());
-      hash_table_.resize_at_least(count);
-    } else {
-      hash_table_.clear();
-    }
-    index_type j = 0;
-    for (value_type const& key : keys_) {
-      // unless the invariant has been broken all keys will be different, therefore predicate will always return false
-      // hash_table handles always_false in a more optimal way
-      insert_key_into_table(key, j++);
-    }
+    base::rehash(count, keys_);
   }
 
   /**
@@ -1084,13 +1022,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
   {
     detail::containers::reserve(keys_, n);
     if (n <= size()) return;
-
-    bool changed = hash_table_.resize_at_least(detail::at_least<index_type>(capacity(), max_load_factor()));
-    if constexpr (detail::mutable_range<index_container>) {
-      if (changed) { rehash(0); }
-    } else {
-      FLAT_HASH_ASSERT(!changed, "Cannot resize immutable hash table");
-    }
+    base::reserve_for(keys_);
   }
 
   // Observers
@@ -1100,7 +1032,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * @return hasher
    */
   [[nodiscard]] constexpr auto hash_function() const noexcept(std::is_nothrow_copy_constructible_v<hasher>) -> hasher {
-    return hash_.get();
+    return base::hash_function();
   }
 
   /**
@@ -1109,7 +1041,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * @return key_equal
    */
   [[nodiscard]] constexpr auto key_eq() const noexcept(std::is_nothrow_copy_constructible_v<key_equal>) -> key_equal {
-    return key_eq_.get();
+    return base::key_eq();
   }
 
   /**
@@ -1131,16 +1063,14 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    *
    * @return probing_policy&
    */
-  constexpr auto probing() noexcept -> probing_policy& { return hash_table_.probing_policy(); }
+  constexpr auto probing() noexcept -> probing_policy& { return base::probing(); }
 
   /**
    * @brief Probing policy accessor
    *
    * @return probing_policy const&
    */
-  [[nodiscard]] constexpr auto probing() const noexcept -> probing_policy const& {
-    return hash_table_.probing_policy();
-  }
+  [[nodiscard]] constexpr auto probing() const noexcept -> probing_policy const& { return base::probing(); }
 
   /**
    * @brief Accessor to data for contiguous containers
@@ -1261,7 +1191,11 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * @param lhs
    * @param rhs
    */
-  constexpr friend void swap(set& lhs, set& rhs) noexcept(noexcept(lhs.swap(rhs))) { lhs.swap(rhs); }
+  constexpr friend void swap(set& lhs, set& rhs) noexcept(detail::nothrow_swappable_set<set>)
+    requires detail::swappable_set<set>
+  {
+    lhs.swap(rhs);
+  }
 
   /**
    * @brief Erase values matching a predicate
@@ -1281,70 +1215,13 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
    * @return hash_table const&
    */
   [[nodiscard]] constexpr auto table() const noexcept -> hash_table const& {
-    return hash_table_;
-  }
-
- protected:
-  template <detail::set_lookup_key<set> K>
-  [[nodiscard]] constexpr auto equal_predicate(K const& key) const noexcept -> std::predicate<index_type> auto{
-    return [this, &key](index_type index) noexcept(
-               noexcept(key_eq_.get()(key, detail::containers::at(keys_, index)))) -> bool {
-      return key_eq_.get()(key, detail::containers::at(keys_, index));
-    };
-  }
-
-  template <detail::set_lookup_key<set> K, std::predicate<index_type> Pred>
-  [[nodiscard]] constexpr auto find_bucket(K const& key, Pred predicate) const noexcept -> hash_table::const_iterator {
-    return hash_table_.find(hash_.get()(key), predicate);
-  }
-
-  template <detail::set_lookup_key<set> K>
-  [[nodiscard]] constexpr auto find_bucket(K const& key) const noexcept -> hash_table::const_iterator {
-    return find_bucket(key, equal_predicate(key));
-  }
-
-  [[nodiscard]] constexpr auto find_bucket(const_iterator pos) const noexcept -> hash_table::const_iterator {
-    auto offset = static_cast<size_type>(pos - cbegin());
-    // position is known so only need to look for the bucket with matching index, avoids fetching the stored keys
-    return find_bucket(*pos, [offset](index_type index) noexcept { return index == offset; });
+    return base::table();
   }
 
  private:
   // apparently having empty members at the end will overwrite other members...
-  FLAT_HASH_NO_UNIQUE_ADDRESS detail::maybe_empty<Traits> traits_{};
-  FLAT_HASH_NO_UNIQUE_ADDRESS detail::maybe_empty<hasher> hash_{};
-  FLAT_HASH_NO_UNIQUE_ADDRESS detail::maybe_empty<key_equal> key_eq_{};
-
-  hash_table hash_table_;
   key_container keys_;
-
-  constexpr void insert_key_into_table(value_type const& key, index_type index) noexcept {
-    auto [it, probe_state] = hash_table_.find_insertion_bucket(hash_.get()(key), detail::always_false);
-    hash_table_.insert(it, *probe_state, index);
-  }
-
-  constexpr auto ensure_load_factor(size_type n, bool force_rehash = false, bool strict = true) -> bool {
-    if constexpr (detail::containers::resizable<index_container>) {
-      bool resized = false;
-      if (calc_load_factor(n) > max_load_factor()) [[unlikely]] {
-        resized = hash_table_.resize_at_least(detail::at_least<size_type>(n, max_load_factor()));
-      }
-      if (resized || force_rehash) {
-        rehash(0);
-        return true;
-      }
-    } else {
-      if (strict) {
-        FLAT_HASH_ASSERT(calc_load_factor(n) < max_load_factor(),
-                         "Cannot ensure load factor with non-resizable hash table");
-      }
-    }
-    return false;
-  }
-
-  [[nodiscard]] constexpr auto calc_load_factor(size_type n) const noexcept -> double {
-    return static_cast<double>(n) / static_cast<double>(bucket_count());
-  }
+  FLAT_HASH_NO_UNIQUE_ADDRESS detail::maybe_empty<Traits> traits_{};
 
   /**
    * @brief Directly assign values to key_container if the container is not back_emplaceable, mostly useful for fixed
@@ -1360,28 +1237,33 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     [[maybe_unused]] size_type n = std::ranges::size(keys_);
 
     index_type added = 0;
-    auto out = std::ranges::begin(keys_);
+    auto const first = std::ranges::begin(keys_);
+    auto out = first;
+    bool overfull = false;
     for (auto&& v : values) {
-      auto [probe, probe_state] = hash_table_.find_insertion_bucket(hash_.get()(v), equal_predicate(v));
-      if (!probe_state) [[unlikely]] { continue; }
-      if constexpr (!detail::containers::resizable<key_container>) {
-        // check that we are still within the container size
-        if (added == n) [[unlikely]] {  // LCOV_EXCL_LINE
-          FLAT_HASH_ASSERT(false, "Tried to add more unique values than the container could hold ({:d}): {}", n,
-                           detail::maybe_format_arg(values));
-          break;
+      std::ranges::subrange keys(first, out);
+      base::template try_insert_at<ordering>(v, keys, out, [&out, &v, &added, &overfull, &values, n](index_type) {
+        if constexpr (!detail::containers::resizable<key_container>) {
+          // check that we are still within the container size
+          if (added == n) [[unlikely]] {  // LCOV_EXCL_LINE
+            FLAT_HASH_ASSERT(false, "Tried to add more unique values than the container could hold ({:d}): {}", n,
+                             detail::maybe_format_arg(values));
+            overfull = true;
+            return;
+          }
         }
-      }
 
-      if constexpr (std::ranges::borrowed_range<R>) {
-        *out = v;
-      } else {
-        *out = std::move(v);
-      }
-      // update table after assignment in case it throws
-      hash_table_.insert(probe, *probe_state, added);
-      ++out;
-      ++added;
+        if constexpr (std::ranges::borrowed_range<R>) {
+          *out = v;
+        } else {
+          *out = std::move(v);
+        }
+
+        ++out;
+        ++added;
+      });
+
+      if (overfull) [[unlikely]] { break; }  // LCOV_EXCL_LINE from assertion
     }
 
     if constexpr (detail::containers::resizable<key_container>) {
@@ -1392,96 +1274,44 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     }
   }
 
-  template <detail::set_addable_key<set> K, bool Move>
-  constexpr auto try_insert_impl(const_iterator pos, K& key, std::bool_constant<Move>) -> std::pair<iterator, bool> {
-    // forwarding is controlled by Move so that this method never consumes the key argument if it is already present in
-    // the set
-
+  template <detail::set_addable_key<set> K>
+  constexpr auto try_insert_impl(const_iterator pos, K&& key) -> std::pair<iterator, bool> {
     auto offset = pos - cbegin();
     FLAT_HASH_ASSERT(offset <= std::ranges::ssize(keys_), "Iterator past the end");
-    ensure_load_factor(size() + 1);
 
-    auto [table_iterator, probe_state] = hash_table_.find_insertion_bucket(hash_.get()(key), equal_predicate(key));
+    auto [index, inserted] =
+        base::template try_insert_at<ordering>(key, keys_, pos.base(), [this, &key, iter = pos.base()](index_type) {
+          detail::containers::policy_insert<ordering>(keys_, iter, std::forward<K>(key));
+        });
 
-    auto forwarded_key = [&key]() noexcept -> decltype(auto) {
-      if constexpr (Move && !std::is_const_v<K>) {
-        return std::move(key);
-      } else {
-        return key;
-      }
-    };
-
-    iterator out{};
-    auto index = static_cast<index_type>(offset);
-    if (probe_state) {
-      if (pos == cend()) {
-        detail::containers::emplace_back(keys_, forwarded_key());
-        hash_table_.insert(table_iterator, *probe_state, index);
-        out = std::ranges::begin(keys_) + ssize() - 1;
-      } else {
-        if constexpr (ordering == ordering_policy::preserved && detail::containers::insertible_to<K, key_container>) {
-          out = detail::containers::policy_insert<ordering>(keys_, pos.base(), forwarded_key());
-
-          // shift the indices and then insert the value
-          hash_table_.mutate_if([index](index_type i) noexcept { return i >= index; },
-                                [](index_type i) noexcept { return i + 1; });
-          hash_table_.insert(table_iterator, *probe_state, index);
-        } else if constexpr (ordering == ordering_policy::relaxed) {
-          auto swap_iter = find_bucket(pos);
-          // may throw so do it first before updating hash table
-          out = detail::containers::policy_insert<ordering>(keys_, pos.base(), forwarded_key());
-
-          // first modify the swapped bucket because insert may invalidate it, i.e. robin_hood probing
-          hash_table_.overwrite(swap_iter, static_cast<index_type>(ssize() - 1));
-          hash_table_.insert(table_iterator, *probe_state, index);
-        } else {
-          detail::containers::emplace_back(keys_, forwarded_key());
-          hash_table_.insert(table_iterator, *probe_state, index);
-          out = std::ranges::begin(keys_) + ssize() - 1;
-        }
-      }
-    } else {
-      out = std::ranges::begin(keys_) + static_cast<difference_type>(table_iterator.decoded());
-    }
-
-    return {out, probe_state.has_value()};
+    return {begin() + static_cast<difference_type>(index), inserted};
   }
 
-  template <detail::set_addable_key<set> K, bool Move>
-  constexpr auto insert_impl(const_iterator pos, K& key, std::bool_constant<Move> move) -> iterator {
-    auto [iter, added] = try_insert_impl(pos, key, move);
+  template <detail::set_addable_key<set> K>
+  constexpr auto insert_impl(const_iterator pos, K&& key) -> iterator {
+    auto [iter, added] = try_insert_impl(pos, std::forward<K>(key));
 
     if (!added) { traits_.on_duplicate_key(*iter); }
     return iter;
   }
 
-  constexpr auto extract_impl(hash_table::const_iterator bucket_iterator) -> std::optional<value_type> {
-    if (bucket_iterator == hash_table_.end()) {
-      // not found
-      return std::nullopt;
-    }
-
-    auto index = *bucket_iterator;
-    auto first = std::ranges::begin(keys_);
-    auto iter = first + static_cast<difference_type>(index);
+  template <class K>
+  constexpr auto extract_impl(K const& key) -> std::optional<value_type> {
     std::optional<value_type> value = std::nullopt;
-    if constexpr (ordering == ordering_policy::preserved) {
-      value = detail::containers::extract<ordering>(keys_, iter);
-      hash_table_.clear_bucket(bucket_iterator);
-
-      if (index < size()) {
-        hash_table_.mutate_if([index](index_type bucket_value) noexcept { return bucket_value > index; },
-                              [](index_type bucket_value) noexcept { return --bucket_value; });
-      }
-    } else if constexpr (ordering == ordering_policy::relaxed) {
-      auto last = first + std::ranges::ssize(keys_) - 1;
-      auto last_table_iter = hash_table_.find(hash_.get()(*last), equal_predicate(*last));
-      value = detail::containers::extract<ordering>(keys_, iter);
-      hash_table_.swap_buckets(bucket_iterator, last_table_iter);
-      hash_table_.clear_bucket(bucket_iterator);
-    }
-
+    base::template try_erase<ordering>(keys_, key, [this, &value](index_type index) {
+      auto pos = std::ranges::cbegin(keys_) + static_cast<difference_type>(index);
+      value = detail::containers::extract<ordering>(keys_, pos);
+    });
     return value;
+  }
+
+  constexpr auto extract_impl(const_iterator pos) -> value_type {
+    std::optional<value_type> value = std::nullopt;
+    base::template try_erase<ordering>(keys_, pos.base(), [this, &value](index_type index) {
+      auto iter = std::ranges::cbegin(keys_) + static_cast<difference_type>(index);
+      value = detail::containers::extract<ordering>(keys_, iter);
+    });
+    return *value;
   }
 
   template <class K, class Opts>
@@ -1536,7 +1366,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
         }
       }
 
-      ensure_load_factor(size());
+      base::ensure_load_factor(keys_, 0, true);
     }
     FLAT_HASH_CATCH(...) {
       // erasing from the end is much less likely to throw if it does
@@ -1547,7 +1377,7 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
     // no need to rehash previous keys as values were simply placed into key container
     auto const s = static_cast<index_type>(size());
     for (auto i = static_cast<index_type>(old_size); i < s; ++i) {
-      insert_key_into_table(detail::containers::at(keys_, i), i);
+      base::insert_new_key(base::hash(detail::containers::at(keys_, i)), i);
     }
   }
 
@@ -1567,12 +1397,11 @@ class set : public detail::containers::maybe_enable_allocator_type<typename Trai
   template <std::ranges::range R>
   constexpr void try_reserve_for(R const& range) {
     if constexpr (std::ranges::sized_range<R>) {
-      size_type old_size = size();
       if constexpr (detail::reservable_set<set>) {
-        reserve(old_size + std::ranges::size(range));
+        reserve(size() + std::ranges::size(range));
       } else {
         // don't need to be strict about hash table size if the range can have duplicates
-        ensure_load_factor(old_size + std::ranges::size(range), /* rehash = */ false, /* strict = */ unique_range<R>);
+        base::ensure_load_factor(keys_, /* extra = */ std::ranges::size(range), /* strict = */ unique_range<R>);
       }
     }
   }

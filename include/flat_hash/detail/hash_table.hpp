@@ -137,10 +137,13 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
     }
 
     [[nodiscard]] constexpr auto raw() const noexcept(nothrow_dereference<base_iterator>) -> reference { return *it_; }
+    [[nodiscard]] constexpr auto decoded() const noexcept(nothrow_dereference<base_iterator>) -> reference {
+      return policy_->decode(*it_);
+    }
 
     [[nodiscard]] constexpr auto dereference() const noexcept(nothrow_dereference<base_iterator>) -> reference {
       FLAT_HASH_ASSERT(policy_ != nullptr, "Cannot decode value with null policy");
-      return holds_value() ? policy_->decode(*it_) : *it_;
+      return holds_value() ? decoded() : raw();
     }
     constexpr void increment() noexcept(nothrow_increment<base_iterator>) { ++it_; }
     constexpr void decrement() noexcept(nothrow_decrement<base_iterator>) { --it_; }
@@ -485,7 +488,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
 
   friend constexpr void swap(hash_table& lhs,
                              hash_table& rhs) noexcept(nothrow_swappable<Container>&& nothrow_swappable<policy>)
-    requires std::is_swappable_v<Container> && std::is_swappable_v<policy>
+    requires swappable<Container> && swappable<policy>
   {
     std::ranges::swap(lhs.indices_, rhs.indices_);
     std::ranges::swap(lhs.policy_, rhs.policy_);

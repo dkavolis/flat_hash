@@ -27,13 +27,22 @@
         </Expand>
     </Type>
 
+    <Type Name="flat_hash::v0::detail::hash_container_base&lt;*&gt;">
+        <DisplayString>{table_}</DisplayString>
+        <Expand>
+            <Item Name="[hash]">hash_</Item>
+            <Item Name="[key_eq]">key_eq_</Item>
+            <Item Name="[table]">table_</Item>
+        </Expand>
+    </Type>
+
     <Type Name="flat_hash::v0::set&lt;*&gt;">
         <DisplayString>{keys_}</DisplayString>
         <Expand>
             <Item Name="[traits]">traits_</Item>
             <Item Name="[hash]">hash_</Item>
             <Item Name="[key_eq]">key_eq_</Item>
-            <Item Name="[hash_table]">hash_table_</Item>
+            <Item Name="[table]">table_</Item>
             <ExpandedItem>keys_</ExpandedItem>
         </Expand>
     </Type>
