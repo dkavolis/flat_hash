@@ -113,7 +113,8 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
    * @brief A wrapper over Container::(const_)iterator for easier checking if the bucket holds anything and
    * dereferencing
    */
-  class iterator : public iterator_facade<iterator> {
+  class iterator
+      : public iterator_facade<iterator, std::contiguous_iterator<std::ranges::iterator_t<Container const>>> {
    public:
     using base_iterator = std::ranges::iterator_t<Container const>;
     using reference = value_type;
