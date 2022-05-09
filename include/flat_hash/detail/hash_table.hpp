@@ -90,6 +90,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   using difference_type = std::ranges::range_difference_t<Container>;
   using policy = Policy;
   using probing_iterator = probing::iterator_t<policy, Container>;
+  using probing_info = probing::probing_info_t<policy, Container>;
 
   constexpr static bool uses_tombstones = !probing::disable_tombstones_v<Policy>;
 
@@ -357,7 +358,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
 
   template <std::predicate<value_type> TPredicate>
   constexpr auto find_insertion_bucket(std::uint64_t hash, TPredicate&& predicate) const
-      -> std::pair<const_iterator, std::optional<probing_iterator>> {
+      -> std::pair<const_iterator, std::optional<probing_info>> {
     auto [probe_it, return_reason] = find_if(hash, predicate);
 
     auto it = cbegin() + static_cast<difference_type>(*probe_it);
@@ -368,7 +369,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
     return {it, probe_it};
   }
 
-  constexpr void insert(const_iterator pos, probing_iterator const& state, value_type value) noexcept {
+  constexpr void insert(const_iterator pos, probing_info state, value_type value) noexcept {
     auto offset = pos - cbegin();
     auto it = std::ranges::begin(indices_) + offset;
     policy_.get().pre_insert(indices_, state);

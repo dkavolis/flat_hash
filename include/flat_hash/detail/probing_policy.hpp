@@ -48,41 +48,72 @@ concept probing_end_type =
     std::same_as<insert_end, std::remove_cvref_t<T>> || std::same_as<lookup_end, std::remove_cvref_t<T>>;
 
 template <class T>
-concept probing_iterator = std::input_iterator<T> &&
-                           requires(T it) {
-                             { *it } -> std::integral;
-                           } && detail::weakly_equality_comparable_with<T, insert_end> &&
-                           detail::weakly_equality_comparable_with<T, lookup_end>;
+concept probing_iterator = std::input_iterator<T> && requires(T it) {
+  { *it } -> std::integral;
+} && detail::weakly_equality_comparable_with<T, insert_end> && detail::weakly_equality_comparable_with<T, lookup_end>;
+
+template <class T, class R>
+concept prober_for = std::ranges::random_access_range<R> &&
+    requires(T const& policy, R const& range, std::uint64_t hash) {
+  { policy.probe(range, hash) } -> probing_iterator;
+};
 
 template <class T, std::ranges::random_access_range R>
-  requires requires(T const& policy, R const& range, std::uint64_t hash) {
-             { policy.probe(range, hash) } -> probing_iterator;
-           }
-using iterator_t = decltype(std::declval<T>().probe(std::declval<R&>(), 0));
+  requires prober_for<T, R>
+using iterator_t = decltype(std::declval<T const&>().probe(std::declval<R&>(), 0));
 
-// clang-format off
+/**
+ * @brief Empty probing info struct that templated probing iterators can convert to if encoding and pre_insert do not
+ * require any state information
+ */
+struct empty_probing_info {};
+
+template <class T, class R>
+concept probing_info_decayable = prober_for<T, R> && requires {
+  typename T::probing_info;
+  requires std::convertible_to < iterator_t<T, R>,
+  typename T::probing_info > ;
+};
+
+template <class T, class R>
+struct probing_info_type;
+
+template <class T, class R>
+  requires prober_for<T, R>
+struct probing_info_type<T, R> {
+  using type = iterator_t<T, R>;
+};
+template <class T, class R>
+  requires probing_info_decayable<T, R>
+struct probing_info_type<T, R> {
+  using type = typename T::probing_info;
+};
+
+template <class T, class R>
+using probing_info_t = probing_info_type<T, R>::type;
 
 template <class T, class R = std::vector<std::uint32_t>>
-concept probing_policy = std::ranges::random_access_range<R> && std::is_move_constructible_v<T> &&
-    requires(T const& policy, R const& container, std::uint64_t hash) {
-  { policy.probe(container, hash) } -> probing_iterator;
-  { policy.reserved_bits() } noexcept -> std::unsigned_integral;
-  { policy.max_load_factor() } noexcept -> std::floating_point;
+concept probing_policy = std::semiregular<T> && prober_for<T, R> && requires(T const& policy, std::uint64_t hash) {
+  { policy.reserved_bits() }
+  noexcept->std::unsigned_integral;
+  { policy.max_load_factor() }
+  noexcept->std::floating_point;
   requires requires(std::ranges::range_value_t<R> payload) {
-    { policy.decode(payload) } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
+    { policy.decode(payload) }
+    noexcept->std::same_as<std::ranges::range_value_t<R>>;
   };
   // immutable ranges don't need encode/replace and pre_insert/post_erase
-  requires (!detail::mutable_range<R> || requires(std::ranges::range_value_t<R> v, iterator_t<T, R> state) {
-    { policy.encode(v, state) } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
-    { policy.reencode(v, v) } noexcept -> std::same_as<std::ranges::range_value_t<R>>;
-    requires requires(T& pol, std::ranges::iterator_t<R> pos) {
-      { pol.pre_insert(container, state) };
-      { pol.post_erase(container, pos) };
+  requires(!detail::mutable_range<R> || requires(std::ranges::range_value_t<R> v, probing_info_t<T, R> info) {
+    { policy.encode(v, info) }
+    noexcept->std::same_as<std::ranges::range_value_t<R>>;
+    { policy.reencode(v, v) }
+    noexcept->std::same_as<std::ranges::range_value_t<R>>;
+    requires requires(T & pol, R & container, std::ranges::iterator_t<R const> pos) {
+      {pol.pre_insert(container, info)};
+      {pol.post_erase(container, pos)};
     };
   });
 };
-
-// clang-format on
 
 /**
  * @brief Disable tombstones if your probing policy takes care of empty slots on removal
@@ -90,7 +121,7 @@ concept probing_policy = std::ranges::random_access_range<R> && std::is_move_con
  * @tparam T probing policy type
  */
 template <class T>
-struct disable_tombstones : std::false_type {};
+constexpr inline bool disable_tombstones_v = false;
 
 /**
  * @brief Basic probing policy which is only missing probe(...) method, for use with policies that don't encode any
@@ -100,18 +131,21 @@ struct basic_probing_policy {
   [[nodiscard]] static constexpr auto reserved_bits() noexcept -> std::uint8_t { return 0; }
   [[nodiscard]] static constexpr auto max_load_factor() noexcept -> double { return 0.75; }
 
-  [[nodiscard]] constexpr auto decode(std::unsigned_integral auto v) const noexcept { return v; }
-  template <class T>
-  [[nodiscard]] constexpr auto reencode(T /* value */, std::type_identity_t<T> new_value) const noexcept -> T {
+  template <std::unsigned_integral U>
+  [[nodiscard]] constexpr auto decode(U v) const noexcept -> U {
+    return v;
+  }
+  template <std::unsigned_integral U>
+  [[nodiscard]] constexpr auto reencode(U /* value */, std::type_identity_t<U> new_value) const noexcept -> U {
     return new_value;
   }
-  template <std::input_or_output_iterator T>
-  [[nodiscard]] constexpr auto encode(std::unsigned_integral auto v, T const& /* state */) const noexcept {
+  template <std::unsigned_integral U, class T>
+  [[nodiscard]] constexpr auto encode(U v, T /* state */) const noexcept -> U {
     return v;
   }
 
-  template <std::ranges::random_access_range R, class It>
-  constexpr void pre_insert(R const& /* r */, It const& /* state */) const noexcept {
+  template <std::ranges::random_access_range R, class T>
+  constexpr void pre_insert(R const& /* r */, T /* state */) const noexcept {
     // nothing to do
   }
   template <std::ranges::random_access_range R>
@@ -125,6 +159,8 @@ struct basic_probing_policy {
  */
 struct python : basic_probing_policy {
   constexpr static std::size_t default_perturb_shift = 5;
+  using probing_info = empty_probing_info;
+
   struct iterator : iterator_facade<iterator> {
     std::uint64_t perturb;
     std::uint64_t index;
@@ -138,6 +174,7 @@ struct python : basic_probing_policy {
     [[nodiscard]] constexpr auto dereference() const noexcept -> std::uint64_t { return index; }
     [[nodiscard]] static constexpr auto equals(insert_end /*unused*/) noexcept -> bool { return false; }
     [[nodiscard]] static constexpr auto equals(lookup_end /*unused*/) noexcept -> bool { return false; }
+    [[nodiscard]] constexpr operator probing_info() const noexcept { return {}; }
   };
 
   template <std::ranges::random_access_range R>
@@ -161,6 +198,8 @@ struct python : basic_probing_policy {
  * @brief Quadratic probing policy, less clumping than linearnoexcept
  */
 struct quadratic : basic_probing_policy {
+  using probing_info = empty_probing_info;
+
   struct iterator : iterator_facade<iterator> {
     std::uint64_t i;
     std::uint64_t index;
@@ -173,6 +212,7 @@ struct quadratic : basic_probing_policy {
     [[nodiscard]] constexpr auto dereference() const noexcept -> std::uint64_t { return index; }
     [[nodiscard]] static constexpr auto equals(insert_end /*unused*/) noexcept -> bool { return false; }
     [[nodiscard]] static constexpr auto equals(lookup_end /*unused*/) noexcept -> bool { return false; }
+    [[nodiscard]] constexpr operator probing_info() const noexcept { return {}; }
   };
 
   template <std::ranges::random_access_range R>
@@ -201,6 +241,11 @@ class robin_hood {
   constexpr robin_hood() noexcept = default;
   constexpr explicit robin_hood(std::uint8_t bits) noexcept : psl_bits_(bits) {}
 
+  struct probing_info {
+    std::uint64_t index;
+    std::uint16_t psl;
+  };
+
   template <std::random_access_iterator It>
   struct iterator : iterator_facade<iterator<It>> {
     using difference_type = std::iter_difference_t<It>;
@@ -222,6 +267,12 @@ class robin_hood {
       return psl > static_cast<std::uint16_t>(begin[static_cast<difference_type>(index)] & psl_mask);
     }
     [[nodiscard]] constexpr auto equals(lookup_end /*unused*/) const noexcept -> bool { return psl > max_psl; }
+    [[nodiscard]] constexpr operator probing_info() const noexcept {
+      return {
+          .index = index,
+          .psl = psl,
+      };
+    }
   };
 
   template <std::ranges::random_access_range R>
@@ -247,9 +298,9 @@ class robin_hood {
 
   [[nodiscard]] constexpr auto decode(std::unsigned_integral auto v) const noexcept { return v >> psl_bits_; }
 
-  template <std::unsigned_integral U, class It>
-  [[nodiscard]] constexpr auto encode(U v, iterator<It> const& state) const noexcept {
-    return encode_psl(v, state.psl);
+  template <std::unsigned_integral U>
+  [[nodiscard]] constexpr auto encode(U v, probing_info info) const noexcept {
+    return encode_psl(v, info.psl);
   }
 
   template <std::integral T>
@@ -260,17 +311,18 @@ class robin_hood {
   constexpr void on_clear() noexcept { max_psl_ = 0; }
 
   template <std::ranges::random_access_range R>
-  constexpr void pre_insert(R& r, iterator<std::ranges::iterator_t<R const>> state) noexcept {
+    requires detail::mutable_range<R>
+  constexpr void pre_insert(R& r, probing_info info) noexcept {
     constexpr auto empty_value = empty_bucket_v<std::ranges::range_value_t<R>>;
-    update_max_psl(state.psl);
-    auto new_width = static_cast<std::uint8_t>(std::bit_width(state.psl));
+    update_max_psl(info.psl);
+    auto new_width = static_cast<std::uint8_t>(std::bit_width(info.psl));
 
     if (new_width > psl_bits_) [[unlikely]] {
       // number of data bits has changed so have to reencode the entire range
       change_width(r, new_width);
     }
 
-    auto index = static_cast<std::ranges::range_difference_t<R>>(state.index);
+    auto index = static_cast<std::ranges::range_difference_t<R>>(info.index);
     auto begin = std::ranges::begin(r);
     auto it = begin + index;
 
@@ -329,6 +381,7 @@ class robin_hood {
   }
 
   template <std::ranges::random_access_range R>
+    requires detail::mutable_range<R>
   constexpr void post_erase(R& r, std::ranges::iterator_t<R const> pos) const noexcept {
     constexpr auto empty_value = empty_bucket_v<std::ranges::range_value_t<R>>;
 
@@ -405,10 +458,7 @@ class robin_hood {
 };
 
 template <>
-struct disable_tombstones<robin_hood> : std::true_type {};
-
-template <class T>
-constexpr static bool disable_tombstones_v = disable_tombstones<T>::value;
+constexpr inline bool disable_tombstones_v<robin_hood> = true;
 
 }  // namespace probing
 
