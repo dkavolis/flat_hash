@@ -40,29 +40,23 @@ struct traits : public Traits {
   using probing_policy = Probing;
 };
 
-template <class Key, probing::probing_policy Probing = probing::quadratic,
-          ordering_policy Policy = ordering_policy::preserved>
+template <class Key, probing::probing_policy Probing, ordering_policy Policy>
 using set = ::flat_hash::set<Key, traits<dynamic_set_traits<Key>, Policy, Probing>>;
 
-template <class Key, probing::probing_policy Probing = probing::quadratic,
-          ordering_policy Policy = ordering_policy::preserved>
+template <class Key, probing::probing_policy Probing, ordering_policy Policy>
 using fixed_set = ::flat_hash::set<Key, traits<fixed_set_traits<Key, 5>, Policy, Probing>>;
 
-template <class Key, probing::probing_policy Probing = probing::quadratic,
-          ordering_policy Policy = ordering_policy::preserved>
+template <class Key, probing::probing_policy Probing, ordering_policy Policy>
 using inline_set = ::flat_hash::set<Key, traits<inline_set_traits<Key, 64>, Policy, Probing>>;
 
-template <class Key, probing::probing_policy Probing = probing::quadratic,
-          ordering_policy Policy = ordering_policy::preserved>
+template <class Key, probing::probing_policy Probing, ordering_policy Policy>
 using set_view = ::flat_hash::set<Key, traits<set_view_traits<Key>, Policy, Probing>>;
 
-template <class Key, probing::probing_policy Probing = probing::quadratic,
-          ordering_policy Policy = ordering_policy::preserved>
+template <class Key, probing::probing_policy Probing, ordering_policy Policy>
 using fixed_set_view = ::flat_hash::set<Key, traits<set_view_traits<Key, 5>, Policy, Probing>>;
 
 namespace pmr {
-template <class Key, probing::probing_policy Probing = probing::quadratic,
-          ordering_policy Policy = ordering_policy::preserved>
+template <class Key, probing::probing_policy Probing, ordering_policy Policy>
 using set = ::flat_hash::set<Key, traits<dynamic_set_traits<Key>, Policy, Probing>>;
 }
 
@@ -86,11 +80,11 @@ using set = ::flat_hash::set<Key, traits<dynamic_set_traits<Key>, Policy, Probin
 
 }  // namespace testing
 
-using dynamic_set = testing::set<int>;
-using span_set = testing::set_view<int>;
-using array_set = testing::fixed_set<int>;
-using fixed_span_set = testing::fixed_set_view<int>;
-using tiny_set = testing::inline_set<int>;
+using dynamic_set = testing::set<int, probing::quadratic, ordering_policy::preserved>;
+using span_set = testing::set_view<int, probing::quadratic, ordering_policy::preserved>;
+using array_set = testing::fixed_set<int, probing::quadratic, ordering_policy::preserved>;
+using fixed_span_set = testing::fixed_set_view<int, probing::quadratic, ordering_policy::preserved>;
+using tiny_set = testing::inline_set<int, probing::quadratic, ordering_policy::preserved>;
 
 template class set<int>;
 template class set<int, inline_set_traits<int, 64>>;
@@ -320,7 +314,7 @@ TEST_CASE("Allocators are passed to allocator aware containers", "[set][allocato
 
 TEMPLATE_TEST_CASE("set::max_size returns reasonable values", "[set][max_size]", probing::quadratic, probing::python,
                    probing::robin_hood) {
-  testing::set<int, TestType> s;
+  testing::set<int, TestType, ordering_policy::preserved> s;
 
   CHECK(s.max_size() < std::numeric_limits<std::uint32_t>::max());
   CHECK(std::bit_width(s.max_size()) == 32U - s.probing().reserved_bits());
@@ -914,7 +908,7 @@ TEMPLATE_TEST_CASE("set::rehash can be used to increase the number of buckets", 
                    probing::python, probing::robin_hood) {
   constexpr static std::initializer_list values = {1, 2, 3, 4, 5};
   SECTION("std::vector sets increase the number of buckets") {
-    testing::set<int, TestType> s = values;
+    testing::set<int, TestType, ordering_policy::preserved> s = values;
     CHECK(s.bucket_count() == 8);
     s.rehash(32);
     CHECK(s.bucket_count() == 32);
@@ -922,7 +916,7 @@ TEMPLATE_TEST_CASE("set::rehash can be used to increase the number of buckets", 
   }
 
   SECTION("rehash has no observable effect on valid inline sets") {
-    testing::inline_set<int, TestType> s = values;
+    testing::inline_set<int, TestType, ordering_policy::preserved> s = values;
     CHECK(s.bucket_count() == 128);
     s.rehash(32);
     CHECK(s.bucket_count() == 128);
