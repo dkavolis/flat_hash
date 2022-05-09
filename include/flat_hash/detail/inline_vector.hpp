@@ -160,8 +160,8 @@ class inline_vector {
 
  private:
   // std::aligned_storage_t is deprecated in C++23
-  alignas(alignof(T)) std::byte storage_[sizeof(T) * N];
   size_type count_ = 0;
+  alignas(alignof(T)) std::byte storage_[sizeof(T) * N];
 
   [[nodiscard]] constexpr auto elem_ptr(size_type index) noexcept -> T* {
     FLAT_HASH_ASSUME(index <= N);
