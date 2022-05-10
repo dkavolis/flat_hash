@@ -400,20 +400,32 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   }
 
   /**
-   * @brief Mutate all filled buckets satisfying the predicate
+   * @brief Increment stored indices in all filled buckets
    *
-   * @param predicate predicate for mutation
-   * @param fn mutation function
+   * @param i lowest index inclusive to increment
    */
-  constexpr void mutate_if(std::predicate<value_type> auto&& predicate,
-                           invocable_r<value_type, value_type> auto&& fn) noexcept
+  constexpr void increment_after(value_type i) noexcept
     requires mutable_range<Container>
   {
     for (value_type& payload : indices_) {
-      if (payload >= tombstone) continue;
+      if (payload >= tombstone) { continue; }
       value_type index = policy_.get().decode(payload);
-      // TODO: benchmark with/without predicate
-      if (predicate(index)) { payload = policy_.get().reencode(payload, fn(index)); }
+      if (index >= i) { payload = policy_.get().reencode(payload, index + 1); }
+    }
+  }
+
+  /**
+   * @brief Decrement stored indices in all filled buckets
+   *
+   * @param i lowest index inclusive to decrement
+   */
+  constexpr void decrement_after(value_type i) noexcept
+    requires mutable_range<Container>
+  {
+    for (value_type& payload : indices_) {
+      if (payload >= tombstone) { continue; }
+      value_type index = policy_.get().decode(payload);
+      if (index >= i) { payload = policy_.get().reencode(payload, index - 1); }
     }
   }
 

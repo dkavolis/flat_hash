@@ -64,6 +64,29 @@ template <std::integral U, std::unsigned_integral UI>
 // both will probably have not much difference because there is a lot going on already with lookup and insertions but
 // will improve compile times
 
+template <std::unsigned_integral U>
+struct index_equality_predicate {
+  U index;
+
+  template <std::unsigned_integral T>
+  [[nodiscard]] constexpr auto operator()(T value) const noexcept -> bool {
+    return index == value;
+  }
+};
+
+template <class Key, std::ranges::random_access_range R,
+          equality_comparator<Key, std::ranges::range_reference_t<R const>> KeyEq>
+struct item_equality_predicate {
+  R const& items;
+  Key const& item;
+  KeyEq key_eq;
+
+  template <std::unsigned_integral T>
+  [[nodiscard]] constexpr auto operator()(T index) const noexcept -> bool {
+    return key_eq(item, containers::at(items, index));
+  }
+};
+
 template <index_range Container, probing::probing_policy<Container> Policy, std::semiregular Hash,
           std::semiregular KeyEq>
 class hash_container_base : public containers::maybe_enable_allocator_type<Container> {
@@ -184,15 +207,13 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
   template <class K>
     requires hash_for<hasher, K>
   [[nodiscard]] constexpr auto find_at(K const& key, index_type index) const -> const_iterator {
-    return table_.find(hash(key), [index](index_type i) noexcept { return index == i; });
+    return table_.find(hash(key), index_equality_predicate{index});
   }
 
   template <std::ranges::random_access_range Keys, class K = std::ranges::range_value_t<Keys>>
     requires(valid_key<K, std::ranges::range_value_t<Keys>, hasher, key_equal>)
   [[nodiscard]] constexpr auto find_in(K const& key, Keys const& keys) const -> const_iterator {
-    return table_.find(hash(key), [&key, &keys, this](index_type index) -> bool {
-      return key_eq_.get()(key, containers::at(keys, index));
-    });
+    return table_.find(hash(key), item_equality_predicate{keys, key, key_eq()});
   }
 
   [[nodiscard]] constexpr auto load_factor(size_type n) const noexcept -> float {
@@ -256,8 +277,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
     requires(valid_key<Key, std::ranges::range_value_t<Keys>, hasher, key_equal>)
   constexpr auto try_insert_at(Key const& key, Keys& keys, std::ranges::iterator_t<Keys const&> pos, OnInsert on_insert)
       -> std::pair<index_type, bool> {
-    auto [table_pos, info] = table_.find_insertion_bucket(
-        hash(key), [&key, &keys, this](index_type index) { return key_eq_.get()(key, containers::at(keys, index)); });
+    auto [table_pos, info] = table_.find_insertion_bucket(hash(key), item_equality_predicate(keys, key, key_eq()));
     auto offset = static_cast<index_type>(pos - std::ranges::cbegin(keys));
     auto size = static_cast<index_type>(std::ranges::size(keys));
     const_iterator swap_iter;
@@ -338,8 +358,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
         // inserting not at the end, need to sync the bucket that will have their elements
         if constexpr (Ordering == ordering_policy::preserved) {
           // shift the indices and then insert the value
-          table_.mutate_if([index](index_type i) noexcept { return i >= index; },
-                           [](index_type i) noexcept { return i + 1; });
+          table_.increment_after(index);
         } else if constexpr (Ordering == ordering_policy::relaxed) {
           // first modify the swapped bucket because insert may invalidate it, i.e. robin_hood probing
           table_.overwrite(at_swap, keys_count);
@@ -363,8 +382,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
 
     if (index != keys_count - 1) {
       if constexpr (Ordering == ordering_policy::preserved) {
-        table_.mutate_if([index](index_type bucket_value) noexcept { return bucket_value > index; },
-                         [](index_type bucket_value) noexcept { return --bucket_value; });
+        table_.decrement_after(index);
       } else if constexpr (Ordering == ordering_policy::relaxed) {
         table_.swap_buckets(pos, last);
       }
