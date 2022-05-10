@@ -25,6 +25,7 @@
 #include <algorithm>  // for std::ranges::for_each
 #include <utility>
 
+#include "../config.hpp"
 #include "../macros.hpp"
 #include "allocators.hpp"
 #include "concepts.hpp"
