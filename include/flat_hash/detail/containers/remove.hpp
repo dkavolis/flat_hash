@@ -117,7 +117,7 @@ struct _policy_remove_fn<ordering_policy::relaxed> {
         construct_at(allocator, ptr, [source] { return destructive_move(*source); });
       } else {
         // no reason to destroy the moved-from object they will be destroyed by other methods
-        construct_at(allocator, ptr, [source] { return std::move(*source); });
+        construct_at(allocator, ptr, [source] { return std::ranges::iter_move(source); });
       }
 
       ++target;
