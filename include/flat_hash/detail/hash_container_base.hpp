@@ -328,7 +328,11 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
                             OnInsert on_insert) -> std::pair<index_type, bool> {
     if (info) {
       // may throw so do it before modifying hash table
-      std::invoke(on_insert, index);
+      if constexpr (std::convertible_to<std::invoke_result_t<OnInsert, index_type>, bool>) {
+        if (!std::invoke(on_insert, index)) [[unlikely]] { return {keys_count, false}; }
+      } else {
+        std::invoke(on_insert, index);
+      }
 
       if (index != keys_count) {
         // inserting not at the end, need to sync the bucket that will have their elements

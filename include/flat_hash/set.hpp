@@ -1237,7 +1237,7 @@ class set : private detail::hash_container_base_t<Traits>,
             FLAT_HASH_ASSERT(false, "Tried to add more unique values than the container could hold ({:d}): {}", n,
                              detail::maybe_format_arg(values));
             overfull = true;
-            return;
+            return false;  // don't add
           }
         }
 
@@ -1249,6 +1249,7 @@ class set : private detail::hash_container_base_t<Traits>,
 
         ++out;
         ++added;
+        return true;
       });
 
       if (overfull) [[unlikely]] { break; }  // LCOV_EXCL_LINE from assertion
