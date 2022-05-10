@@ -82,6 +82,7 @@ concept formattable = ((!std::ranges::range<T> && formattable_impl<T, Char>) ||
                        (std::ranges::range<T> && formattable_impl<std::ranges::range_value_t<T>, Char>));
 
 #else
+  // clang-format off
 // even if std implements compile time format string checking, the type itself is for exposition only... can't do
 // compile time format string checking without referencing hidden types (╯°□°）╯︵ ┻━┻
 template <class... Args>
@@ -89,6 +90,7 @@ using format_string = std::string_view;
 
 template <class T, class Char = char>
 concept formattable = std::is_fundamental_v<std::remove_cvref_t<T>> || has_formatter<T, std::format_context>;
+// clang-format on
 #endif
 
 // LCOV_EXCL_START
@@ -98,7 +100,9 @@ template <class... Args>
   fmt::string_view str = format;
   return {str.data(), str.size()};
 #else
+    // clang-format off
   return format;
+// clang-format on
 #endif
 }
 // LCOV_EXCL_STOP

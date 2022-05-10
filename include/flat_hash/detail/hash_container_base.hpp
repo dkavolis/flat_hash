@@ -38,11 +38,12 @@ concept hash_container_base_applied =
 
 template <class Base>
 concept swappable_hash_container_base = swappable<typename Base::hash_table_type> && swappable<typename Base::hasher> &&
-    swappable<typename Base::key_equal>;
+                                        swappable<typename Base::key_equal>;
 
 template <class Base>
-concept nothrow_swappable_hash_container_base = nothrow_swappable<typename Base::hash_table_type> &&
-    nothrow_swappable<typename Base::hasher> && nothrow_swappable<typename Base::key_equal>;
+concept nothrow_swappable_hash_container_base =
+    nothrow_swappable<typename Base::hash_table_type> && nothrow_swappable<typename Base::hasher> &&
+    nothrow_swappable<typename Base::key_equal>;
 
 /**
  * @brief Helper function for computing the lowest number of buckets for specified load_factor
@@ -88,7 +89,8 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
   using iterator = hash_table_type::iterator;
   using const_iterator = hash_table_type::const_iterator;
 
-  constexpr hash_container_base() requires std::is_default_constructible_v<hash_table_type>
+  constexpr hash_container_base()
+    requires std::is_default_constructible_v<hash_table_type>
   = default;
   constexpr hash_container_base(size_type bucket_count, probing_policy const& policy,
                                 optional_allocator<index_container> const& allocator, hasher const& hash,
@@ -127,7 +129,10 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
 
   [[nodiscard]] constexpr auto get_allocator() const noexcept(containers::nothrow_gettable_allocator<index_container>)
       -> containers::allocator_t<hash_table_type>
-    requires containers::gettable_allocator<index_container> { return table_.get_allocator(); }
+    requires containers::gettable_allocator<index_container>
+  {
+    return table_.get_allocator();
+  }
 
   [[nodiscard]] constexpr auto begin() const noexcept -> const_iterator { return table_.cbegin(); }
   [[nodiscard]] constexpr auto end() const noexcept -> const_iterator { return table_.end(); }
@@ -155,11 +160,15 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
     return static_cast<size_type>(max_load_factor() * static_cast<float>(bucket_count()));
   }
 
-  constexpr void clear() noexcept requires mutable_range<index_container> { table_.clear(); }
+  constexpr void clear() noexcept
+    requires mutable_range<index_container>
+  {
+    table_.clear();
+  }
 
-  constexpr void swap(hash_container_base& other) noexcept(
-      nothrow_swappable_hash_container_base<hash_container_base>) requires
-      swappable_hash_container_base<hash_container_base> {
+  constexpr void swap(hash_container_base& other) noexcept(nothrow_swappable_hash_container_base<hash_container_base>)
+    requires swappable_hash_container_base<hash_container_base>
+  {
     if (this == &other) [[unlikely]] { return; }
     std::ranges::swap(table_, other.table_);
     std::ranges::swap(hash_, other.hash_);
@@ -179,7 +188,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
   }
 
   template <std::ranges::random_access_range Keys, class K = std::ranges::range_value_t<Keys>>
-    requires valid_key<K, std::ranges::range_value_t<Keys>, hasher, key_equal>
+    requires(valid_key<K, std::ranges::range_value_t<Keys>, hasher, key_equal>)
   [[nodiscard]] constexpr auto find_in(K const& key, Keys const& keys) const -> const_iterator {
     return table_.find(hash(key), [&key, &keys, this](index_type index) -> bool {
       return key_eq_.get()(key, containers::at(keys, index));
@@ -244,7 +253,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
 
   template <ordering_policy Ordering, class Key, std::ranges::random_access_range Keys,
             std::invocable<index_type> OnInsert>
-    requires valid_key<Key, std::ranges::range_value_t<Keys>, hasher, key_equal>
+    requires(valid_key<Key, std::ranges::range_value_t<Keys>, hasher, key_equal>)
   constexpr auto try_insert_at(Key const& key, Keys& keys, std::ranges::iterator_t<Keys const&> pos, OnInsert on_insert)
       -> std::pair<index_type, bool> {
     auto [table_pos, info] = table_.find_insertion_bucket(
@@ -264,7 +273,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
 
   template <ordering_policy Ordering, std::ranges::random_access_range Keys, std::invocable<index_type> OnErase,
             class Key = std::ranges::range_value_t<Keys>>
-    requires valid_key<Key, std::ranges::range_value_t<Keys>, hasher, key_equal>
+    requires(valid_key<Key, std::ranges::range_value_t<Keys>, hasher, key_equal>)
   constexpr auto try_erase(Keys& keys, Key const& key, OnErase on_erase) -> bool {
     auto iter = find_in(key, keys);
     if (iter == end()) { return false; }
@@ -300,8 +309,9 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
   [[nodiscard]] constexpr auto probing() const noexcept -> probing_policy const& { return table_.probing_policy(); }
 
   constexpr friend void swap(hash_container_base& lhs, hash_container_base& rhs) noexcept(
-      nothrow_swappable_hash_container_base<hash_container_base>) requires
-      swappable_hash_container_base<hash_container_base> {
+      nothrow_swappable_hash_container_base<hash_container_base>)
+    requires swappable_hash_container_base<hash_container_base>
+  {
     lhs.swap(rhs);
   }
 
