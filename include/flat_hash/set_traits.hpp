@@ -185,4 +185,20 @@ struct dynamic_set_traits : flat_hash::dynamic_set_traits<Key> {
 };
 }  // namespace pmr
 
+namespace detail {
+template <set_traits T>
+using hash_container_base_t = hash_container_base<typename T::index_container, typename T::probing_policy,
+                                                  typename T::hasher, typename T::key_equal>;
+
+/**
+ * @brief Whether the key type can be used for lookup
+ *
+ * @tparam K key type
+ * @tparam Set set/dict type
+ */
+template <class K, class Set>
+concept hashed_lookup_key = valid_key<K, typename Set::key_type, typename Set::hasher, typename Set::key_equal>;
+
+}  // namespace detail
+
 FLAT_HASH_NAMESPACE_END

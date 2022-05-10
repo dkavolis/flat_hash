@@ -47,23 +47,13 @@ concept mutable_set = is_set<Set> &&
                       (mutable_range<typename Set::key_container> && mutable_range<typename Set::index_container>);
 
 /**
- * @brief Whether the key type can be used for lookup
- *
- * @tparam K key type
- * @tparam Set set type
- */
-template <class K, class Set>
-concept set_lookup_key =
-    is_set<Set> && valid_key<K, typename Set::value_type, typename Set::hasher, typename Set::key_equal>;
-
-/**
  * @brief Whether the key type can be used for adding to the set
  *
  * @tparam K key type
  * @tparam Set set type
  */
 template <class K, class Set>
-concept set_addable_key = is_set<Set> && (set_lookup_key<K, Set> && mutable_set<Set> &&
+concept set_addable_key = is_set<Set> && (hashed_lookup_key<K, Set> && mutable_set<Set> &&
                                           containers::back_emplaceable<typename Set::key_container>);
 
 /**
@@ -73,7 +63,7 @@ concept set_addable_key = is_set<Set> && (set_lookup_key<K, Set> && mutable_set<
  * @tparam Set set type
  */
 template <class K, class Set>
-concept set_removable_key = is_set<Set> && (set_lookup_key<K, Set> && mutable_set<Set> &&
+concept set_removable_key = is_set<Set> && (hashed_lookup_key<K, Set> && mutable_set<Set> &&
                                             containers::erasable<typename Set::key_container>);
 
 /**
@@ -200,15 +190,13 @@ struct set_init {
 };
 
 template <class Key, set_traits_for<Key> Traits>
-class set : private detail::hash_container_base<typename Traits::index_container, typename Traits::probing_policy,
-                                                typename Traits::hasher, typename Traits::key_equal>,
+class set : private detail::hash_container_base_t<Traits>,
             public detail::containers::maybe_enable_allocator_type<typename Traits::key_container> {
   template <class K, set_traits_for<K> T>
   friend class set;
 
  public:
-  using base = detail::hash_container_base<typename Traits::index_container, typename Traits::probing_policy,
-                                           typename Traits::hasher, typename Traits::key_equal>;
+  using base = detail::hash_container_base_t<Traits>;
   using traits_type = Traits;
   using options_type = set_init<traits_type>;
   using index_container = base::index_container;
@@ -858,7 +846,7 @@ class set : private detail::hash_container_base<typename Traits::index_container
    *
    * @copydetail set::contains(key_type const&)
    */
-  template <detail::set_lookup_key<set> K>
+  template <detail::hashed_lookup_key<set> K>
   [[nodiscard]] constexpr auto contains(K const& key) const noexcept -> bool {
     return find(key) != end();
   }
@@ -878,7 +866,7 @@ class set : private detail::hash_container_base<typename Traits::index_container
    *
    * @copydetail set::count(key_type const&)
    */
-  template <detail::set_lookup_key<set> K>
+  template <detail::hashed_lookup_key<set> K>
   [[nodiscard]] constexpr auto count(K const& key) const noexcept -> size_type {
     return contains(key) ? 1 : 0;
   }
@@ -901,7 +889,7 @@ class set : private detail::hash_container_base<typename Traits::index_container
    *
    * @copydetail set::find(key_type const&)
    */
-  template <detail::set_lookup_key<set> K>
+  template <detail::hashed_lookup_key<set> K>
   [[nodiscard]] constexpr auto find(K const& key) const noexcept -> const_iterator {
     auto bucket = base::find_in(key, keys_);
     if (bucket != base::end()) { return begin() + static_cast<difference_type>(*bucket); }
@@ -929,7 +917,7 @@ class set : private detail::hash_container_base<typename Traits::index_container
    *
    * @copydetail set::equal_range(key_type const&)
    */
-  template <detail::set_lookup_key<set> K>
+  template <detail::hashed_lookup_key<set> K>
   [[nodiscard]] constexpr auto equal_range(K const& key) const noexcept -> std::pair<const_iterator, const_iterator> {
     auto iter = find(key);
     if (iter == end()) { return {end(), end()}; }
@@ -980,7 +968,7 @@ class set : private detail::hash_container_base<typename Traits::index_container
    *
    * @copydetail set::bucket(key_type const&)
    */
-  template <detail::set_lookup_key<set> K>
+  template <detail::hashed_lookup_key<set> K>
   [[nodiscard]] constexpr auto bucket(K const& key) const noexcept -> size_type {
     return static_cast<size_type>(base::find_in(key, keys_) - base::begin());
   }
@@ -1116,7 +1104,7 @@ class set : private detail::hash_container_base<typename Traits::index_container
    * @return false otherwise
    */
   template <class K, class Opts>
-    requires(detail::set_lookup_key<K, set> || detail::set_lookup_key<Key, set<K, Opts>>)
+    requires(detail::hashed_lookup_key<K, set> || detail::hashed_lookup_key<Key, set<K, Opts>>)
   [[nodiscard]] constexpr friend auto operator==(set const& lhs, set<K, Opts> const& rhs) noexcept -> bool {
     return lhs.size() == rhs.size() && lhs.is_subset_of(rhs);
   }
@@ -1132,7 +1120,7 @@ class set : private detail::hash_container_base<typename Traits::index_container
    * @return false otherwise
    */
   template <class K, class Opts>
-    requires(detail::set_lookup_key<K, set> || detail::set_lookup_key<Key, set<K, Opts>>)
+    requires(detail::hashed_lookup_key<K, set> || detail::hashed_lookup_key<Key, set<K, Opts>>)
   [[nodiscard]] constexpr friend auto operator<(set const& lhs, set<K, Opts> const& rhs) noexcept -> bool {
     return lhs.size() < rhs.size() && lhs.is_subset_of(rhs);
   }
@@ -1148,7 +1136,7 @@ class set : private detail::hash_container_base<typename Traits::index_container
    * @return false otherwise
    */
   template <class K, class Opts>
-    requires(detail::set_lookup_key<K, set> || detail::set_lookup_key<Key, set<K, Opts>>)
+    requires(detail::hashed_lookup_key<K, set> || detail::hashed_lookup_key<Key, set<K, Opts>>)
   [[nodiscard]] constexpr friend auto operator<=(set const& lhs, set<K, Opts> const& rhs) noexcept -> bool {
     return lhs.size() <= rhs.size() && lhs.is_subset_of(rhs);
   }
@@ -1164,7 +1152,7 @@ class set : private detail::hash_container_base<typename Traits::index_container
    * @return false otherwise
    */
   template <class K, class Opts>
-    requires(detail::set_lookup_key<K, set> || detail::set_lookup_key<Key, set<K, Opts>>)
+    requires(detail::hashed_lookup_key<K, set> || detail::hashed_lookup_key<Key, set<K, Opts>>)
   [[nodiscard]] constexpr friend auto operator>(set const& lhs, set<K, Opts> const& rhs) noexcept -> bool {
     return lhs.size() > rhs.size() && rhs.is_subset_of(lhs);
   }
@@ -1180,7 +1168,7 @@ class set : private detail::hash_container_base<typename Traits::index_container
    * @return false otherwise
    */
   template <class K, class Opts>
-    requires(detail::set_lookup_key<K, set> || detail::set_lookup_key<Key, set<K, Opts>>)
+    requires(detail::hashed_lookup_key<K, set> || detail::hashed_lookup_key<Key, set<K, Opts>>)
   [[nodiscard]] constexpr friend auto operator>=(set const& lhs, set<K, Opts> const& rhs) noexcept -> bool {
     return lhs.size() >= rhs.size() && rhs.is_subset_of(lhs);
   }
@@ -1315,9 +1303,9 @@ class set : private detail::hash_container_base<typename Traits::index_container
   }
 
   template <class K, class Opts>
-    requires(detail::set_lookup_key<K, set> || detail::set_lookup_key<Key, set<K, Opts>>)
+    requires(detail::hashed_lookup_key<K, set> || detail::hashed_lookup_key<Key, set<K, Opts>>)
   [[nodiscard]] constexpr auto is_subset_of(set<K, Opts> const& rhs) const noexcept -> bool {
-    if constexpr (detail::set_lookup_key<Key, set<K, Opts>>) {
+    if constexpr (detail::hashed_lookup_key<Key, set<K, Opts>>) {
       return std::ranges::all_of(keys_, [&rhs](key_type const& key) -> bool { return rhs.contains(key); });
     } else {
       // slow path
