@@ -251,7 +251,7 @@ class set : private detail::hash_container_base_t<Traits>,
    * @param init set initialization options
    */
   constexpr explicit set(size_type bucket_count, set_init<Traits> init = set_init<Traits>())
-    requires(std::constructible_from<hash_table, size_type> && !detail::static_sized<key_container>)
+    requires(!detail::static_sized<key_container>)
   : base(bucket_count, init.policy, init.index_allocator, init.hash_function, init.key_eq),
     keys_(detail::containers::make_container<key_container>(0, init.key_allocator)),
     traits_(std::move(init.traits)) {
