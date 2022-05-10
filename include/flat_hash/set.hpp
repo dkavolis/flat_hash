@@ -1255,7 +1255,7 @@ class set : private detail::hash_container_base_t<Traits>,
     }
 
     if constexpr (detail::containers::resizable<key_container>) {
-      detail::containers::resize(keys_, n + added);
+      detail::containers::resize(keys_, added);
     } else {
       FLAT_HASH_ASSERT(added == n, "Not enough unique values ({:d}), expected {:d}: {}", added, n,
                        detail::maybe_format_arg(values));
