@@ -56,7 +56,7 @@ struct dynamic_dictionary_traits : dynamic_set_traits<Key> {
 
 template <class Key, class Value, std::size_t Extent = std::dynamic_extent>
 struct dictionary_view_traits : set_view_traits<Key, Extent> {
-  using value_container = std::span<Value const, Extent>;
+  using value_container = std::span<Value, Extent>;  // values can be mutable, instead specify from the template
 
   constexpr static void on_missing_key(Key const& /* key */) noexcept {}
 };
