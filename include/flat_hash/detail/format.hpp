@@ -164,12 +164,11 @@ template <class... Args>
   auto it = ctx.begin();
   auto const end = ctx.end();
 
-  using Char = std::iter_value_t<decltype(it)>;
   if (it == end) { return {it, options}; }
 
   // the formatting errors here would be caught at compile time so exclude them from coverage
 
-  if (*it == Char{'l'}) {
+  if (*it == 'l') {
     options.new_lines = true;
     ++it;
     // LCOV_EXCL_START
@@ -179,12 +178,12 @@ template <class... Args>
 
   // LCOV_EXCL_BR_START
   switch (*it) {
-    case Char{':'}: {
+    case ':': {
       // switching to a subformatter
       ++it;
       break;
     }
-    case Char{'}'}: {
+    case '}': {
       // end of the format string
       break;
     }
@@ -239,11 +238,7 @@ template <class Char, std::ranges::sized_range R, class OutputIt,
 }
 
 template <class Char>
-constexpr inline auto unformattable_str = std::to_array<Char>({
-    Char{'{'},
-    Char{'?'},
-    Char{'}'},
-});
+constexpr inline auto unformattable_str = std::to_array<Char>({'{', '?', '}'});
 
 template <class Char = char, class T>
 [[nodiscard]] constexpr auto maybe_format_arg(T&& value) noexcept -> decltype(auto) {
