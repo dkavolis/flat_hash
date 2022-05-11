@@ -199,6 +199,32 @@ using hash_container_base_t = hash_container_base<typename T::index_container, t
 template <class K, class Set>
 concept hashed_lookup_key = valid_key<K, typename Set::key_type, typename Set::hasher, typename Set::key_equal>;
 
+template <class Values>
+struct ref_view {
+  using type = std::ranges::ref_view<Values>;
+};
+
+// use std::span for contiguous ranges
+template <std::ranges::contiguous_range Values>
+struct ref_view<Values> {
+  using type = std::span<std::remove_reference_t<std::ranges::range_reference_t<Values>>>;
+};
+template <std::ranges::contiguous_range Values>
+  requires static_sized<Values>
+struct ref_view<Values> {
+  using type = std::span<std::remove_reference_t<std::ranges::range_reference_t<Values>>, static_size_v<Values>>;
+};
+
+template <class Values>
+using ref_view_t = ref_view<Values>::type;
+
 }  // namespace detail
+
+template <set_traits T>
+struct ref_set_traits : T {
+  // TODO: decay traits into predefined ones if possible?
+  using index_container = detail::ref_view_t<typename T::index_container const>;
+  using key_container = detail::ref_view_t<typename T::key_container const>;
+};
 
 FLAT_HASH_NAMESPACE_END
