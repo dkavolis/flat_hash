@@ -314,35 +314,8 @@ TEST_CASE("Generic container concepts", "[internal][concepts][containers]") {
 }
 
 TEST_CASE("Generic container functions", "[internal][containers]") {
-  constexpr static std::initializer_list<int> init = {0, 1, 2, 3};
+  static std::initializer_list<std::string> strings = {"first", "second", "third", "fourth", "fifth"};
   SECTION("std::vector") {
-    std::vector<int> v = init;
-
-    SECTION("construction") {
-      WHEN("can construct from size") { testing::test_construct(std::vector<int>(4), 4U); }
-      WHEN("can construct from size and value") { testing::test_construct(std::vector<int>(4, 1), 4U, 1); }
-      WHEN("can construct from size, value and allocator") {
-        CHECK(testing::test_construct(std::vector<int>(4, 1), 4U, 1, v.get_allocator()).get_allocator() ==
-              v.get_allocator());
-      }
-    }
-
-    testing::test_allocators<testing::throwing::no>(v, v.get_allocator());
-    testing::test_resize(v, -1);
-    testing::test_reserve(v);
-    testing::test_clear(v);
-    testing::test_assign(v, init);
-    testing::test_append(v, init);
-    testing::test_emplace_back(v, -1);
-    testing::test_erase_after(v);
-    testing::test_erase(v);
-    testing::test_insert(v, init);
-    testing::test_pop_back(v);
-    testing::test_extract(v);
-  }
-
-  SECTION("vector of strings") {
-    static std::initializer_list<std::string> strings = {"first", "second", "third", "fourth", "fifth"};
     std::vector<std::string> v = strings;
 
     SECTION("construction") {
@@ -371,28 +344,6 @@ TEST_CASE("Generic container functions", "[internal][containers]") {
   }
 
   SECTION("inline vector") {
-    inline_vector<int, 10> v = init;
-
-    SECTION("construction") {
-      WHEN("can construct from size") { testing::test_construct(inline_vector<int, 10>(4), 4U); }
-      WHEN("can construct from size and value") { testing::test_construct(inline_vector<int, 10>(4, 1), 4U, 1); }
-    }
-
-    testing::test_allocators<testing::throwing::no>(v, no_allocator{});
-    testing::test_resize<false>(v, -1);
-    testing::test_clear(v);
-    testing::test_assign(v, init);
-    testing::test_append<false>(v, init);
-    testing::test_emplace_back(v, -1);
-    testing::test_erase_after(v);
-    testing::test_erase(v);
-    testing::test_insert(v, init);
-    testing::test_pop_back(v);
-    testing::test_extract(v);
-  }
-
-  SECTION("small vector of strings") {
-    static std::initializer_list<std::string> strings = {"first", "second", "third", "fourth", "fifth"};
     inline_vector<std::string, 10> v = strings;
 
     SECTION("construction") {
