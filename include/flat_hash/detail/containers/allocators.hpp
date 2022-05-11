@@ -80,10 +80,16 @@ using allocator_t = typename allocator_type<T>::type;
 template <class T>
 concept allocator_aware = (!std::same_as<void, allocator_t<T>>);
 
-template <class C>
+template <class... C>
 struct maybe_enable_allocator_type {};
 template <allocator_aware C>
 struct maybe_enable_allocator_type<C> {
+  using allocator_type = allocator_t<C>;
+};
+template <class C, class... T>
+struct maybe_enable_allocator_type<C, T...> : maybe_enable_allocator_type<T...> {};
+template <allocator_aware C, class... T>
+struct maybe_enable_allocator_type<C, T...> {
   using allocator_type = allocator_t<C>;
 };
 
