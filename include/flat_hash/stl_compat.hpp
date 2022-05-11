@@ -22,10 +22,13 @@
 
 #pragma once
 
+#include <map>
 #include <set>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "detail/macros.hpp"
+#include "dictionary_fwd.hpp"
 #include "set_fwd.hpp"
 
 // there are no forward declarations/cannot forward declare standard containers so these are in a separate file to avoid
@@ -36,3 +39,9 @@ inline constexpr bool flat_hash::is_unique_range<std::set<Key, Compare, Allocato
 
 template <class Key, class Hash, class Compare, class Allocator>
 inline constexpr bool flat_hash::is_unique_range<std::unordered_set<Key, Hash, Compare, Allocator>> = true;
+
+template <class Key, class T, class Compare, class Allocator>
+inline constexpr bool flat_hash::is_unique_map<std::map<Key, T, Compare, Allocator>> = true;
+
+template <class Key, class T, class Hash, class Compare, class Allocator>
+inline constexpr bool flat_hash::is_unique_map<std::unordered_map<Key, T, Hash, Compare, Allocator>> = true;

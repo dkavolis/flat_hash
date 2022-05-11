@@ -47,4 +47,35 @@ template <class K, class Value>
 using dictionary = ::flat_hash::dictionary<K, dynamic_dictionary_traits<K, Value>>;
 }  // namespace pmr
 
+/**
+ * @brief Check whether a type derives from set
+ *
+ * @tparam T
+ */
+template <class T>
+concept is_dictionary = detail::is_base_of_template<T, dictionary>::value;
+
+/**
+ * @brief Check whether a type derives from set_iterator
+ *
+ * @tparam T
+ */
+template <class T>
+concept is_dictionary_iterator = detail::is_base_of_template<T, dictionary_iterator>::value;
+
+/**
+ * @brief Traits for ranges of unique (key, value) pairs to allow optimizing range insertions into dictionary
+ *
+ * @tparam T
+ */
+template <class T>
+inline constexpr bool is_unique_map = false;
+;
+template <class Key, class T, class Traits>
+inline constexpr bool is_unique_map<dictionary<Key, T, Traits>> = true;
+
+template <class T>
+concept unique_map = std::ranges::range<T> &&
+                     (is_dictionary<std::remove_cvref_t<T>> || is_unique_map<std::remove_cvref_t<T>>);
+
 FLAT_HASH_NAMESPACE_END
