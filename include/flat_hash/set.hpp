@@ -306,7 +306,7 @@ class set : private detail::hash_container_base_t<Traits>,
 
   template <std::input_iterator It>
     requires(std::constructible_from<Key, std::iter_value_t<It>> && detail::mutable_range<index_container>)
-  constexpr explicit set(It first, It last, set_init<Traits> init = set_init<Traits>())
+  constexpr set(It first, It last, set_init<Traits> init = set_init<Traits>())
       : set(std::ranges::subrange(first, last), std::move(init)) {}
 
   /**
