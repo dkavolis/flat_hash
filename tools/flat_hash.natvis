@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.microsoft.com/vstudio/debugger/natvis/2010
+file:///C:/Program%20Files/Microsoft%20Visual%20Studio/2022/Community/Xml/Schemas/1033/natvis.xsd">
+
     <Type Name="flat_hash::v0::detail::inline_vector&lt;*&gt;">
         <DisplayString>{{size = {count_}}}</DisplayString>
         <Expand>
