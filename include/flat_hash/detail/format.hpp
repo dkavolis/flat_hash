@@ -224,17 +224,17 @@ template <class Char, std::ranges::sized_range R, class OutputIt,
               FormatFn>
 [[nodiscard]] constexpr auto format_range(R const& r, FLAT_HASH_FORMAT_NS basic_format_context<OutputIt, Char>& context,
                                           separators<char> const& strings, FormatFn&& format) -> OutputIt {
-  auto it = std::ranges::copy(strings.prefix, context.out());
+  auto it = std::ranges::copy(strings.prefix, context.out()).out;
 
   std::int64_t i = std::ranges::ssize(r);
   for (auto&& value : r) {
     it = write_range_item(value, context, format);
     --i;
 
-    if (i != 0) [[likely]] { it = std::ranges::copy(strings.separator, it); }
+    if (i != 0) [[likely]] { it = std::ranges::copy(strings.separator, it).out; }
   }
 
-  return std::ranges::copy(strings.postfix, it);
+  return std::ranges::copy(strings.postfix, it).out;
 }
 
 template <class Char>
