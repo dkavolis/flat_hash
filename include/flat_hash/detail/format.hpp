@@ -107,18 +107,18 @@ template <class... Args>
 }
 // LCOV_EXCL_STOP
 
-
+template <class Char = char>
 struct separators {
-  std::string_view prefix;
-  std::string_view separator;
-  std::string_view postfix;
+  std::basic_string_view<Char> prefix;
+  std::basic_string_view<Char> separator;
+  std::basic_string_view<Char> postfix;
 };
 
 struct range_format_options {
   bool new_lines = false;
 };
 
-[[nodiscard]] constexpr auto get_set_separators(range_format_options options) noexcept -> separators {
+[[nodiscard]] constexpr auto get_set_separators(range_format_options options) noexcept -> separators<char> {
   if (options.new_lines) {
     return {
         .prefix = "{\n\t",
@@ -134,7 +134,7 @@ struct range_format_options {
   };
 }
 
-[[nodiscard]] constexpr auto get_list_separators(range_format_options options) noexcept -> separators {
+[[nodiscard]] constexpr auto get_list_separators(range_format_options options) noexcept -> separators<char> {
   if (options.new_lines) {
     return {
         .prefix = "[\n\t",
