@@ -346,6 +346,38 @@ class set : private detail::hash_container_base_t<Traits>,
       : base(other), keys_(other.keys_), traits_(std::move(t)) {}
 
   /**
+   * @brief Converting constructor from a compatible hash container base reference and its keys, implicitly convertible
+   * if containers are also implicitly convertible.
+   *
+   * @tparam Base compatible hash container base
+   * @tparam Keys compatible keys container type
+   *
+   * @param other other hashed container base
+   * @param keys other hashed container keys
+   * @param traits traits to use for this set
+   */
+  template <class Base, class Keys>
+    requires(std::constructible_from<key_container, Keys&> && detail::compatible_base<Base&, base>)
+  constexpr explicit(!(std::convertible_to<Keys&, key_container> && std::convertible_to<Base&, base>))
+      set(Base& other, Keys& keys,
+          Traits t = Traits()) noexcept((std::is_nothrow_move_constructible_v<Traits> &&
+                                         std::is_nothrow_constructible_v<key_container, Keys&> &&
+                                         std::is_nothrow_constructible_v<base, Base&>))
+      : base(other), keys_(keys), traits_(std::move(t)) {}
+
+  /**
+   * @copydoc set::set(Base&, Keys&, Traits)
+   */
+  template <class Base, class Keys>
+    requires(std::constructible_from<key_container, Keys const&> && detail::compatible_base<Base const&, base>)
+  constexpr explicit(!(std::convertible_to<Keys const&, key_container> && std::convertible_to<Base const&, base>))
+      set(Base const& other, Keys const& keys,
+          Traits t = Traits()) noexcept((std::is_nothrow_move_constructible_v<Traits> &&
+                                         std::is_nothrow_constructible_v<key_container, Keys const&> &&
+                                         std::is_nothrow_constructible_v<base, Base const&>))
+      : base(other), keys_(keys), traits_(std::move(t)) {}
+
+  /**
    * @brief Default copy constructor
    *
    */
