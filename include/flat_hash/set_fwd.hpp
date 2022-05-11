@@ -98,23 +98,20 @@ concept is_set = detail::is_base_of_template<T, set>::value;
 template <class T>
 concept is_set_iterator = detail::is_base_of_template<T, set_iterator>::value;
 
+// TODO: set slices that are unique ranges
+
 /**
  * @brief Traits for ranges of unique values to allow optimizing range insertions into set
  *
  * @tparam T
  */
 template <class T>
-struct is_unique_range : std::false_type {};
+inline constexpr bool is_unique_range = false;
 template <class T, class Traits>
-struct is_unique_range<set<T, Traits>> : std::true_type {};
-
-// TODO: set slices that are unique ranges
-
-template <class T>
-inline constexpr bool is_unique_range_v = is_unique_range<T>::value;
+inline constexpr bool is_unique_range<set<T, Traits>> = true;
 
 template <class T>
 concept unique_range = std::ranges::range<T> &&
-                       (is_set<std::remove_cvref_t<T>> || is_unique_range_v<std::remove_cvref_t<T>>);
+                       (is_set<std::remove_cvref_t<T>> || is_unique_range<std::remove_cvref_t<T>>);
 
 FLAT_HASH_NAMESPACE_END

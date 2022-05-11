@@ -28,15 +28,11 @@
 #include "detail/macros.hpp"
 #include "set_fwd.hpp"
 
-FLAT_HASH_NAMESPACE_BEGIN
-
 // there are no forward declarations/cannot forward declare standard containers so these are in a separate file to avoid
 // increasing compile times
 
 template <class Key, class Compare, class Allocator>
-struct is_unique_range<std::set<Key, Compare, Allocator>> : std::true_type {};
+inline constexpr bool flat_hash::is_unique_range<std::set<Key, Compare, Allocator>> = true;
 
 template <class Key, class Hash, class Compare, class Allocator>
-struct is_unique_range<std::unordered_set<Key, Hash, Compare, Allocator>> : std::true_type {};
-
-FLAT_HASH_NAMESPACE_END
+inline constexpr bool flat_hash::is_unique_range<std::unordered_set<Key, Hash, Compare, Allocator>> = true;
