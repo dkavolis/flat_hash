@@ -107,15 +107,6 @@ template <class... Args>
 }
 // LCOV_EXCL_STOP
 
-template <class Char, std::output_iterator<Char> It>
-constexpr auto write_to(It iterator, std::string_view str) -> It {
-  for (char c : str) {
-    *iterator = Char{c};
-    ++iterator;
-  }
-
-  return iterator;
-}
 
 struct separators {
   std::string_view prefix;
@@ -210,29 +201,41 @@ template <class... Args>
   return {it, options};
 }
 
+template <class Value, class OutputIt, class Char, class Format>
+constexpr auto write_range_item(Value const& value, FLAT_HASH_FORMAT_NS basic_format_context<OutputIt, Char>& ctx,
+                                Format&& format) {
+  constexpr bool string_like = std::convertible_to<Value const&, std::basic_string_view<Char>>;
+  auto out = ctx.out();
+  if constexpr (string_like) { *out++ = '"'; }
+  ctx.advance_to(out);
+  if constexpr (std::invocable<Format, Value const&, decltype((ctx))>) {
+    out = format(value, ctx);
+  } else {
+    out = format.format(value, ctx);
+  }
+  if constexpr (string_like) { *out++ = '"'; }
+  return out;
+}
+
+// TODO: function_ref with direct construction from a compatible formatter
+
 template <class Char, std::ranges::sized_range R, class OutputIt,
           invocable_r<OutputIt, std::ranges::range_reference_t<R const>,
                       FLAT_HASH_FORMAT_NS basic_format_context<OutputIt, Char>&>
               FormatFn>
 [[nodiscard]] constexpr auto format_range(R const& r, FLAT_HASH_FORMAT_NS basic_format_context<OutputIt, Char>& context,
-                                          separators const& strings, FormatFn&& format) -> OutputIt {
-  using reference_type = std::ranges::range_reference_t<R>;
-  constexpr bool string_like = std::convertible_to<reference_type, std::basic_string_view<Char>>;
-  auto it = write_to<Char>(context.out(), strings.prefix);
+                                          separators<char> const& strings, FormatFn&& format) -> OutputIt {
+  auto it = std::ranges::copy(strings.prefix, context.out());
 
   std::int64_t i = std::ranges::ssize(r);
   for (auto&& value : r) {
-    if constexpr (string_like) { *it++ = Char{'"'}; }
-    context.advance_to(it);
-    it = format(value, context);
-    if constexpr (string_like) { *it++ = Char{'"'}; }
-
+    it = write_range_item(value, context, format);
     --i;
 
-    if (i != 0) [[likely]] { it = write_to<Char>(it, strings.separator); }
+    if (i != 0) [[likely]] { it = std::ranges::copy(strings.separator, it); }
   }
 
-  return write_to<Char>(it, strings.postfix);
+  return std::ranges::copy(strings.postfix, it);
 }
 
 template <class Char>
