@@ -34,17 +34,17 @@ template <std::random_access_iterator KeyIter, std::random_access_iterator Value
 class dictionary_iterator;
 
 template <class Key, class Value, std::size_t Extent = std::dynamic_extent>
-using dictionary_view = dictionary<Key, dictionary_view_traits<Key, Value, Extent>>;
+using dictionary_view = dictionary<Key, Value, dictionary_view_traits<Key, Value, Extent>>;
 
 template <class Key, class Value, std::size_t N>
-using fixed_dictionary = dictionary<Key, fixed_dictionary_traits<Key, Value, N>>;
+using fixed_dictionary = dictionary<Key, Value, fixed_dictionary_traits<Key, Value, N>>;
 
 template <class Key, class Value, std::size_t N>
-using inline_dictionary = dictionary<Key, inline_dictionary_traits<Key, Value, N>>;
+using inline_dictionary = dictionary<Key, Value, inline_dictionary_traits<Key, Value, N>>;
 
 namespace pmr {
 template <class K, class Value>
-using dictionary = ::flat_hash::dictionary<K, dynamic_dictionary_traits<K, Value>>;
+using dictionary = ::flat_hash::dictionary<K, Value, dynamic_dictionary_traits<K, Value>>;
 }  // namespace pmr
 
 /**
