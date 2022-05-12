@@ -75,15 +75,55 @@ class RangeMatcher : public Catch::Matchers::MatcherGenericBase {
   }
 };
 
+template <class T>
+struct contains_pred {
+  static_assert(sizeof(T) == 0, "contains_pred is not specialized!");
+};
+
+template <class T>
+contains_pred(T&&) -> contains_pred<std::remove_cvref_t<T>>;
+
+template <is_set Set>
+struct contains_pred<Set> {
+  Set const& s;
+
+  template <detail::hashed_lookup_key<Set> K>
+  [[nodiscard]] constexpr auto operator()(K const& key) const -> bool {
+    return s.contains(key);
+  }
+};
+
+template <is_dictionary Dict>
+struct contains_pred<Dict> {
+  Dict const& d;
+
+  template <detail::hashed_lookup_key<Dict> K>
+  [[nodiscard]] constexpr auto operator()(K const& key) const -> bool {
+    return d.contains(key);
+  }
+
+  template <detail::pair_like P>
+    requires(!detail::hashed_lookup_key<P, Dict> &&
+             detail::weakly_equality_comparable_with<std::tuple_element_t<1, P> const&,
+                                                     typename Dict::mapped_type const&>)
+  [[nodiscard]] constexpr auto operator()(P const& pair) const -> bool {
+    auto&& [key, value] = pair;
+    auto iter = d.find(key);
+    if (iter == d.end()) { return false; }
+    return iter.value() == value;
+  }
+};
+
 template <std::ranges::input_range R>
 class ContainsAnyOf : public RangeMatcher<R> {
  public:
   ContainsAnyOf(R r) noexcept : RangeMatcher<R>(std::forward<R>(r)) {}
 
-  template <class Key, class T>
-  auto match(set<Key, T> const& s) const -> bool {
-    return std::ranges::any_of(this->values(), [&s](auto&& v) { return s.contains(v); });
+  template <class Hashed>
+  auto match(Hashed const& s) const -> bool {
+    return std::ranges::any_of(this->values(), contains_pred{s});
   }
+
   [[nodiscard]] auto describe() const -> std::string override {
     return FLAT_HASH_FORMAT_NS format("contains any of {}", Catch::Detail::stringify(this->values()));
   }
@@ -94,10 +134,11 @@ class ContainsAllOf : public RangeMatcher<R> {
  public:
   ContainsAllOf(R r) noexcept : RangeMatcher<R>(std::forward<R>(r)) {}
 
-  template <class Key, class T>
-  auto match(set<Key, T> const& s) const -> bool {
-    return std::ranges::all_of(this->values(), [&s](auto&& v) { return s.contains(v); });
+  template <class Hashed>
+  auto match(Hashed const& s) const -> bool {
+    return std::ranges::all_of(this->values(), contains_pred{s});
   }
+
   [[nodiscard]] auto describe() const -> std::string override {
     return FLAT_HASH_FORMAT_NS format("contains all of {}", Catch::Detail::stringify(this->values()));
   }
@@ -108,9 +149,9 @@ class ContainsNoneOf : public RangeMatcher<R> {
  public:
   ContainsNoneOf(R r) noexcept : RangeMatcher<R>(std::forward<R>(r)) {}
 
-  template <class Key, class Traits>
-  auto match(set<Key, Traits> const& s) const -> bool {
-    return std::ranges::none_of(this->values(), [&s](auto&& v) { return s.contains(v); });
+  template <class Hashed>
+  auto match(Hashed const& s) const -> bool {
+    return std::ranges::none_of(this->values(), contains_pred{s});
   }
   [[nodiscard]] auto describe() const -> std::string override {
     return FLAT_HASH_FORMAT_NS format("contains none of {}", Catch::Detail::stringify(this->values()));
@@ -149,9 +190,9 @@ class Contains : public Catch::Matchers::MatcherGenericBase {
  public:
   Contains(T value) : value_(std::forward<T>(value)) {}
 
-  template <class Key, class Traits>
-  auto match(set<Key, Traits> const& s) const -> bool {
-    return s.contains(value_);
+  template <class Hashed>
+  auto match(Hashed const& s) const -> bool {
+    return contains_pred{s}(value_);
   }
   auto describe() const -> std::string override {
     return FLAT_HASH_FORMAT_NS format("contains {}", Catch::Detail::stringify(value_));
@@ -166,7 +207,7 @@ class IterEquals : public Catch::Matchers::MatcherGenericBase {
  private:
   std::reference_wrapper<R const> range_;
   iterator it_;
-  mutable iterator last_{};
+  mutable iterator last_{};  // match/describe have to be const, doesn't matter as matchers are not reused
 
  public:
   IterEquals(R const& r, iterator it) noexcept : range_(r), it_(it) {}

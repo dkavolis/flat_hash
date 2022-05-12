@@ -169,6 +169,17 @@ concept index_range = std::ranges::random_access_range<C> && std::unsigned_integ
                       // ensure static size containers are a power of two
                       (!static_sized<C> || std::has_single_bit(static_size_v<C>));
 
+template <std::size_t I, class T>
+using tuple_element_t = typename std::tuple_element<I, std::remove_cvref_t<T>>::type;
+
+template <class P>
+concept pair_like = requires {
+                      typename std::tuple_size<std::remove_cvref_t<P>>;
+                      requires std::tuple_size<std::remove_cvref_t<P>>::value == 2;
+                      typename std::tuple_element<0, std::remove_cvref_t<P>>::type;
+                      typename std::tuple_element<1, std::remove_cvref_t<P>>::type;
+                    };
+
 template <class Derived, template <class...> class T>
 struct is_base_of_template {
  private:
