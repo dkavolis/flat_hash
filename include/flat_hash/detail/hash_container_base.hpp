@@ -278,6 +278,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
     requires(valid_key<Key, std::ranges::range_value_t<Keys>, hasher, key_equal>)
   constexpr auto try_insert_at(Key const& key, Keys& keys, std::ranges::iterator_t<Keys const&> pos, OnInsert on_insert)
       -> std::pair<index_type, bool> {
+    if (table_.bucket_count() == 0) [[unlikely]] { table_.resize_at_least(hash_table_type::default_size); }
     auto [table_pos, info] = table_.find_insertion_bucket(hash(key), item_equality_predicate(keys, key, key_eq()));
     auto offset = static_cast<index_type>(pos - std::ranges::cbegin(keys));
     auto size = static_cast<index_type>(std::ranges::size(keys));
