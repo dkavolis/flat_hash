@@ -158,13 +158,15 @@ class ContainsNoneOf : public RangeMatcher<R> {
   }
 };
 
-template <std::ranges::sized_range R>
+template <std::ranges::sized_range R,
+          detail::equality_comparator<std::ranges::range_reference_t<R>> Comp = detail::equal_to>
 class Equals : public RangeMatcher<R> {
+  Comp compare_;
+
  public:
-  Equals(R r) noexcept : RangeMatcher<R>(std::forward<R>(r)) {}
+  Equals(R r, Comp compare = {}) noexcept : RangeMatcher<R>(std::forward<R>(r)), compare_(compare) {}
 
   template <std::ranges::sized_range Range>
-    requires(std::equality_comparable_with<std::ranges::range_reference_t<R>, std::ranges::range_reference_t<Range>>)
   auto match(Range const& s) const -> bool {
     if (std::ranges::size(this->values()) != std::ranges::size(s)) { return false; }
 
@@ -173,7 +175,7 @@ class Equals : public RangeMatcher<R> {
     auto begin = std::ranges::begin(this->values());
 
     while (set_begin != set_end) {
-      if (*set_begin++ != *begin++) return false;
+      if (!compare_(*set_begin++, *begin++)) return false;
     }
 
     return true;
@@ -290,13 +292,15 @@ template <class T>
   return {r};
 }
 
-template <std::ranges::input_range R>
-[[nodiscard]] auto Equals(R&& r) -> testing::Equals<R> {
-  return {std::forward<R>(r)};
+template <std::ranges::input_range R,
+          detail::equality_comparator<std::ranges::range_reference_t<R>> Comp = detail::equal_to>
+[[nodiscard]] auto Equals(R&& r, Comp compare = {}) -> testing::Equals<R, Comp> {
+  return {std::forward<R>(r), compare};
 }
-template <class T>
-[[nodiscard]] auto Equals(std::initializer_list<T> r) -> testing::Equals<std::initializer_list<T>> {
-  return {r};
+template <class T, detail::equality_comparator<T> Comp = detail::equal_to>
+[[nodiscard]] auto Equals(std::initializer_list<T> r, Comp compare = {})
+    -> testing::Equals<std::initializer_list<T>, Comp> {
+  return {r, compare};
 }
 
 template <class T>
