@@ -110,6 +110,12 @@ template <class T, class... Args>
 }
 
 template <class T, class F>
+  requires(std::is_invocable_r_v<T, F>)
+[[nodiscard]] constexpr auto make_constructor(F&& f) noexcept -> deferred_constructor<F> {
+  return deferred_constructor<F>(std::forward<F>(f));
+}
+
+template <class T, class F>
 [[nodiscard]] constexpr auto make_constructor(deferred_constructor<F>& f) noexcept -> deferred_constructor<F>& {
   return f;
 }
@@ -119,7 +125,7 @@ struct _construct_at_fn {
     requires(std::is_invocable_r_v<T, F>)
   constexpr auto operator()(T* ref, F&& function) const
       noexcept(std::is_nothrow_invocable_v<F>&& std::is_nothrow_constructible_v<T, std::invoke_result_t<F>>) -> T& {
-    return *std::construct_at(ref, deferred_constructor(std::forward<F>(function)));
+    return *std::construct_at(ref, make_constructor<T>(std::forward<F>(function)));
   }
 
   template <mutable_ T, class... Args>
@@ -135,7 +141,7 @@ struct _construct_at_fn {
                !is_allocator<Alloc>) -> T& {
     if constexpr (is_allocator<Alloc>) {
       using traits = std::allocator_traits<Alloc>;
-      traits::construct(allocator, ref, deferred_constructor(std::forward<F>(function)));
+      traits::construct(allocator, ref, make_constructor<T>(std::forward<F>(function)));
       return *ref;
     } else {
       return (*this)(ref, std::forward<F>(function));
