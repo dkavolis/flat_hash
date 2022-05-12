@@ -318,6 +318,21 @@ struct stl_container_traits {
   }
 
   /**
+   * @copydoc stl_containers_traits::insert(R&, const_iterator, value_type&&)
+   */
+  template <class T>
+    requires(detail::containers::member_insert<R, T> || detail::containers::member_emplace<R, T>)
+  constexpr static auto insert(R& container, const_iterator pos, T&& value) -> decltype(auto) {
+    if constexpr (detail::containers::member_emplace<R, T>) {
+      return container.emplace(pos, std::forward<T>(value));
+    } else if constexpr (detail::containers::member_insert<R, T>) {
+      return container.insert(pos, std::forward<T>(value));
+    } else {
+      FLAT_HASH_UNREACHABLE();
+    }
+  }
+
+  /**
    * @brief Remove the last element from the container. Should not throw.
    *
    * @param container
