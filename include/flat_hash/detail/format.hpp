@@ -228,6 +228,7 @@ template <class Char, std::ranges::sized_range R, class OutputIt,
 
   std::int64_t i = std::ranges::ssize(r);
   for (auto&& value : r) {
+    context.advance_to(it);
     it = write_range_item(value, context, format);
     --i;
 
