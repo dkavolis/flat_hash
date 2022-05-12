@@ -300,16 +300,15 @@ struct stl_container_traits {
    * @brief Insert element at pos
    * Enabled if container.emplace(pos, args...) or container.insert(pos, value_type) is valid
    *
-   * @tparam Args
    * @param container
    * @param pos iterator to position where the element is inserted
-   * @param args arguments to value_type initializer
+   * @param value value to insert
    * @return iterator to the inserted element (preffered)
    */
-  template <class... Args>
+  constexpr static auto insert(R& container, const_iterator pos, value_type&& value) -> decltype(auto)
     requires(detail::containers::member_insert<R, value_type> || detail::containers::member_emplace<R, value_type>)
-  constexpr static auto insert(R& container, const_iterator pos, value_type&& value) -> decltype(auto) {
-    if constexpr (detail::containers::member_emplace<R, Args...>) {
+  {
+    if constexpr (detail::containers::member_emplace<R, value_type>) {
       return container.emplace(pos, std::move(value));
     } else if constexpr (detail::containers::member_insert<R, value_type>) {
       return container.insert(pos, std::move(value));
