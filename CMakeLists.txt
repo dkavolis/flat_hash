@@ -88,20 +88,6 @@ if(fmt_FOUND)
   add_fmt_lib(flat_hash-fmt fmt::fmt)
 endif()
 
-include(cmake/CPM.cmake)
-cpmaddpackage(
-  NAME
-  Format.cmake
-  VERSION
-  1.7.3
-  GITHUB_REPOSITORY
-  TheLartians/Format.cmake
-  OPTIONS
-  # set to yes skip cmake formatting
-  "FORMAT_SKIP_CMAKE NO"
-  # path to exclude (optional, supports regular expressions)
-  "CMAKE_FORMAT_EXCLUDE cmake/CPM.cmake|portfile.cmake|CodeCoverage.cmake")
-
 if(FLAT_HASH_ENABLE_DOXYGEN)
   set(DOXYGEN_CALLER_GRAPH YES)
   set(DOXYGEN_CALL_GRAPH YES)
@@ -154,3 +140,20 @@ if(FLAT_HASH_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
+
+
+find_package(Python 3.9 COMPONENTS Interpreter)
+if(Python_Interpreter_FOUND)
+  message(STATUS "Found Python interpreter: ${Python_EXECUTABLE}")
+
+  # also add format target
+  set(format_script "${CMAKE_CURRENT_LIST_DIR}/tools/format.py")
+  add_custom_target(clang_format COMMAND ${Python_EXECUTABLE} ${format_script} --cpp)
+  add_custom_target(cmake_format COMMAND ${Python_EXECUTABLE} ${format_script} --cmake)
+  add_custom_target(iwyu COMMAND ${Python_EXECUTABLE} ${format_script} --iwyu ${CMAKE_CURRENT_BINARY_DIR})
+else()
+  add_custom_target(clang_format COMMAND ${CMAKE_COMMAND} -E echo "No python interpreter!")
+  add_custom_target(cmake_format COMMAND ${CMAKE_COMMAND} -E echo "No python interpreter!")
+  add_custom_target(iwyu COMMAND ${CMAKE_COMMAND} -E echo "No python interpreter!")
+endif()
+add_custom_target(format DEPENDS clang_format cmake_format)
