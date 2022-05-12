@@ -45,7 +45,16 @@ template <class T>
 using options_key_t = std::ranges::range_value_t<typename T::key_container>;
 
 template <class T>
-concept mutable_set_traits = mutable_range<typename T::key_container> && mutable_range<typename T::index_container>;
+concept mutable_set_traits = requires {
+                               requires mutable_range<typename T::key_container>;
+                               requires mutable_range<typename T::index_container>;
+                             };
+
+template <class T>
+concept resizable_set_traits = mutable_set_traits<T> && requires {
+                                                          requires containers::resizable<typename T::key_container>;
+                                                          requires containers::resizable<typename T::index_container>;
+                                                        };
 }  // namespace detail
 
 /**
@@ -72,7 +81,7 @@ concept set_traits = std::is_default_constructible_v<T> &&
                      detail::hash_for<typename T::hasher, std::ranges::range_value_t<typename T::key_container>> &&
                      detail::equality_comparator<typename T::key_equal, detail::options_key_t<T>> &&
                      probing::probing_policy<typename T::probing_policy, typename T::index_container> &&
-                     (!detail::mutable_set_traits<T> ||
+                     (!detail::resizable_set_traits<T> ||
                       // only mutable sets need T::on_duplicate_key
                       requires(T & options, detail::options_key_t<T> const& key) { options.on_duplicate_key(key); });
 
@@ -85,7 +94,7 @@ concept set_traits = std::is_default_constructible_v<T> &&
 template <class T, class Key>
 concept set_traits_for =
     set_traits<T> &&
-    (!detail::mutable_set_traits<T> || requires(T & options, Key const& key) { options.on_duplicate_key(key); }) &&
+    (!detail::resizable_set_traits<T> || requires(T & options, Key const& key) { options.on_duplicate_key(key); }) &&
     detail::hash_for<typename T::hasher, Key> && detail::equality_comparator<typename T::key_equal, Key>;
 
 /**

@@ -31,21 +31,30 @@ template <class T>
 using options_value_t = std::ranges::range_value_t<typename T::value_container>;
 
 template <class T>
-concept mutable_dictionary_traits = mutable_set_traits<T> && mutable_range<typename T::value_container>;
+concept mutable_dictionary_traits =
+    mutable_set_traits<T> && requires { requires mutable_range<typename T::value_container>; };
+
+template <class T>
+concept resizable_dictionary_traits = mutable_dictionary_traits<T> && resizable_set_traits<T> &&
+                                      requires { requires containers::resizable<typename T::value_container>; };
 }  // namespace detail
 
 template <class T>
-concept dictionary_traits = (
-    set_traits<T> && requires { requires std::ranges::random_access_range<typename T::value_container>; } &&
-    requires(T & options, detail::options_key_t<T> const& key) {
-      { options.on_missing_key(key) } -> detail::void_or_convertible_to<detail::options_value_t<T>>;
-    });
+concept dictionary_traits = (set_traits<T> &&
+                             requires { requires std::ranges::random_access_range<typename T::value_container>; } &&
+                             (!detail::resizable_dictionary_traits<T> ||
+                              requires(T & options, detail::options_key_t<T> const& key) {
+                                {
+                                  options.on_missing_key(key)
+                                  } -> detail::void_or_convertible_to<detail::options_value_t<T>>;
+                              }));
 
 template <class T, class Key, class Value>
 concept dictionary_traits_for = (dictionary_traits<T> && set_traits_for<T, Key> &&
-                                 requires(T & options, Key const& key) {
-                                   { options.on_missing_key(key) } -> detail::void_or_convertible_to<Value>;
-                                 });
+                                 (!detail::resizable_dictionary_traits<T> ||
+                                  requires(T & options, Key const& key) {
+                                    { options.on_missing_key(key) } -> detail::void_or_convertible_to<Value>;
+                                  }));
 
 template <class Key, class Value>
 struct dynamic_dictionary_traits : dynamic_set_traits<Key> {
@@ -57,15 +66,11 @@ struct dynamic_dictionary_traits : dynamic_set_traits<Key> {
 template <class Key, class Value, std::size_t Extent = std::dynamic_extent>
 struct dictionary_view_traits : set_view_traits<Key, Extent> {
   using value_container = std::span<Value, Extent>;  // values can be mutable, instead specify from the template
-
-  constexpr static void on_missing_key(Key const& /* key */) noexcept {}
 };
 
 template <class Key, class Value, std::size_t N>
 struct fixed_dictionary_traits : fixed_set_traits<Key, N> {
   using value_container = std::array<Value, N>;
-
-  constexpr static void on_missing_key(Key const& /* key */) noexcept {}
 };
 
 template <class Key, class Value, std::size_t N>
