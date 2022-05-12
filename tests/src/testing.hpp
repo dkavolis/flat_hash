@@ -26,7 +26,12 @@
 
 #include <catch2/catch_tostring.hpp>
 #include <catch2/matchers/catch_matchers_templated.hpp>
-#include <flat_hash/set.hpp>
+#include <flat_hash/dictionary_fwd.hpp>
+#include <flat_hash/set_fwd.hpp>
+
+#if defined(FLAT_HASH_USE_FMTLIB)
+#  include <fmt/ranges.h>
+#endif
 
 namespace Catch {
 template <flat_hash::detail::formattable T>
