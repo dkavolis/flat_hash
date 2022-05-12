@@ -151,7 +151,19 @@ struct _erase_if_fn {
       if constexpr (Policy == ordering_policy::preserved || !std::ranges::bidirectional_range<R>) {
         // remove_if returns subrange of removed elements
         // https://en.cppreference.com/w/cpp/algorithm/ranges/remove
-        last = std::ranges::remove_if(first, end, pred).begin();
+        // std::ranges::remove_if requires indirectly_writable iterator but that doesn't work with zipped iterators...
+        first = std::ranges::find_if(first, end, pred);
+        if (first != end) {
+          last = first;
+          ++first;
+          for (; first != end; ++first) {
+            if (!std::invoke(pred, *first)) {
+              auto&& out_ref = *last;
+              out_ref = std::ranges::iter_move(first);
+              ++last;
+            }
+          }
+        }
       } else {
         while (first != last) {
           // fill in the holes from the end of the range
