@@ -30,6 +30,7 @@
 #include "detail/containers/container_traits.hpp"
 #include "detail/containers/resize.hpp"
 #include "detail/equal_to.hpp"
+#include "detail/hash_container_base_fwd.hpp"
 #include "detail/inline_vector.hpp"
 #include "detail/transparent_hash.hpp"
 #include "probing_policy.hpp"

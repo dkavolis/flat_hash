@@ -23,6 +23,7 @@
 #pragma once
 
 #include "containers/utility.hpp"
+#include "hash_container_base_fwd.hpp"
 #include "hash_table.hpp"
 
 FLAT_HASH_NAMESPACE_BEGIN
