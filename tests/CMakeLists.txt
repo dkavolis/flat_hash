@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(flat_hash_tests LANGUAGES CXX)
 
-set(test_sources src/detail_tests.cpp src/set_tests.cpp)
+set(test_sources src/detail_tests.cpp src/set_tests.cpp src/dictionary_tests.cpp)
 include(../cmake/CompilerWarnings.cmake)
 
 find_package(Catch2 3 CONFIG REQUIRED)

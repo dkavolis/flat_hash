@@ -202,7 +202,7 @@ template <class T, class Comp>
 Equals(T&&, Comp) -> Equals<T, Comp>;
 
 template <class R, class Comp>
-  requires (!std::ranges::range<R>)
+  requires(!std::ranges::range<R>)
 class Equals<R, Comp> : public Catch::Matchers::MatcherGenericBase {
   R item_;
   Comp compare_;
@@ -414,9 +414,9 @@ template <class T>
 }
 
 template <class T, detail::equality_comparator<T> Comp = detail::equal_to>
-  requires (!std::ranges::input_range<T>)
+  requires(!std::ranges::input_range<T>)
 [[nodiscard]] auto Equals(T&& item, Comp compare = {}) -> testing::Equals<T, Comp> {
-  return { std::forward<T>(item), compare};
+  return {std::forward<T>(item), compare};
 }
 
 template <std::ranges::input_range R,

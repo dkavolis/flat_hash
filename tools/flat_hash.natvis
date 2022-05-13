@@ -55,4 +55,68 @@ file:///C:/Program%20Files/Microsoft%20Visual%20Studio/2022/Community/Xml/Schema
             <ExpandedItem>keys_</ExpandedItem>
         </Expand>
     </Type>
+
+    <Type Name="flat_hash::v0::detail::dictionary_iterator_base&lt;*&gt;">
+        <DisplayString>{{ [{key_iterator_,na}]: {value_iterator_,na} }}</DisplayString>
+        <Expand>
+            <Item Name="[key]">key_iterator_,na</Item>
+            <Item Name="[value]">value_iterator_,na</Item>
+        </Expand>
+    </Type>
+
+    <Type Name="flat_hash::v0::detail::mutable_dictionary_range&lt;*&gt;">
+        <DisplayString>{keys_,na}</DisplayString>
+        <Expand>
+            <Item Name="[keys]">keys_,na</Item>
+            <Item Name="[values]">values_,na</Item>
+
+            <CustomListItems Optional="true">
+                <Variable Name="i" InitialValue="0" />
+                <Size>(*keys_).size()</Size>
+                <Loop>
+                    <Item Name="[{(*keys_)[i]}]">(*values_)[i]</Item>
+                    <Exec>++i</Exec>
+                </Loop>
+            </CustomListItems>
+            <CustomListItems Optional="true">
+                <Variable Name="i" InitialValue="0" />
+                <Size>keys_->count_</Size>
+                <Loop>
+                    <Item Name="[{(*keys_)[i]}]">(*values_)[i]</Item>
+                    <Exec>++i</Exec>
+                </Loop>
+            </CustomListItems>
+        </Expand>
+    </Type>
+
+    <Type Name="flat_hash::v0::dictionary&lt;*&gt;">
+        <DisplayString>{keys_}</DisplayString>
+        <Expand>
+            <Item Name="[traits]">traits_</Item>
+            <Item Name="[hash]">hash_</Item>
+            <Item Name="[key_eq]">key_eq_</Item>
+            <Item Name="[table]">table_</Item>
+            <Item Name="[keys]">keys_</Item>
+            <Item Name="[values]">values_</Item>
+
+            <CustomListItems Optional="true">
+                <Variable Name="i" InitialValue="0" />
+                <!-- keys_.size() seems to work huh, at least with std containers -->
+                <Size>keys_.size()</Size>
+                <Loop>
+                    <Item Name="[{keys_[i]}]">values_[i]</Item>
+                    <Exec>++i</Exec>
+                </Loop>
+            </CustomListItems>
+            <CustomListItems Optional="true">
+                <Variable Name="i" InitialValue="0" />
+                <!-- inline_vector compatibility -->
+                <Size>keys_.count_</Size>
+                <Loop>
+                    <Item Name="[{keys_[i]}]">values_[i]</Item>
+                    <Exec>++i</Exec>
+                </Loop>
+            </CustomListItems>
+        </Expand>
+    </Type>
 </AutoVisualizer>
