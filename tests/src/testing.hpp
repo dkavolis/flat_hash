@@ -193,8 +193,42 @@ class ContainsNoneOf : public RangeMatcher<R> {
   }
 };
 
-template <std::ranges::sized_range R, comparator_for<R> Comp = detail::equal_to>
-class Equals : public RangeMatcher<R> {
+template <class R, class Comp = detail::equal_to>
+class Equals;
+
+template <class T>
+Equals(T&&) -> Equals<T, detail::equal_to>;
+template <class T, class Comp>
+Equals(T&&, Comp) -> Equals<T, Comp>;
+
+template <class R, class Comp>
+  requires (!std::ranges::range<R>)
+class Equals<R, Comp> : public Catch::Matchers::MatcherGenericBase {
+  R item_;
+  Comp compare_;
+
+ public:
+  Equals(R item, Comp compare = {}) noexcept : item_(std::forward<R>(item)), compare_(compare) {}
+
+  template <class T>
+  auto match(T const& s) const -> bool {
+    return compare_(s, item_);
+  }
+  template <class T>
+  auto match(std::optional<T> const& s) const -> bool {
+    if constexpr (requires { item_ == std::nullopt; }) {
+      if (item_ == std::nullopt) { return s == std::nullopt; }
+    }
+    if (s == std::nullopt) { return false; }
+    return compare_(*s, item_);
+  }
+  [[nodiscard]] auto describe() const -> std::string override {
+    return FLAT_HASH_FORMAT_NS format("equals {}", Catch::Detail::stringify(item_));
+  }
+};
+
+template <std::ranges::sized_range R, comparator_for<R> Comp>
+class Equals<R, Comp> : public RangeMatcher<R> {
   Comp compare_;
 
  public:
@@ -377,6 +411,12 @@ template <std::ranges::input_range R>
 template <class T>
 [[nodiscard]] auto ContainsNoneOf(std::initializer_list<T> r) -> testing::ContainsNoneOf<std::initializer_list<T>> {
   return {r};
+}
+
+template <class T, detail::equality_comparator<T> Comp = detail::equal_to>
+  requires (!std::ranges::input_range<T>)
+[[nodiscard]] auto Equals(T&& item, Comp compare = {}) -> testing::Equals<T, Comp> {
+  return { std::forward<T>(item), compare};
 }
 
 template <std::ranges::input_range R,
