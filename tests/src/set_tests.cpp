@@ -924,4 +924,24 @@ TEMPLATE_TEST_CASE("set::rehash can be used to increase the number of buckets", 
   }
 }
 
+template <class K, std::size_t N>
+struct bad_inline_traits : inline_set_traits<K, N> {
+  using hasher = bad_hash;
+  using probing_policy = probing::quadratic;
+};
+
+TEST_CASE("Hash tables can be formatted", "[hash_table][format]") {
+  set<int, bad_inline_traits<int, 2>> a{0, 1};
+
+  CHECK(FLAT_HASH_FORMAT_NS format("{}", a.table()) == "[0, 1, -1, -1]");
+  CHECK(FLAT_HASH_FORMAT_NS format("{:}", a.table()) == "[0, 1, -1, -1]");
+  CHECK(FLAT_HASH_FORMAT_NS format("{:l}", a.table()) == "[\n\t0,\n\t1,\n\t-1,\n\t-1,\n]");
+  CHECK(FLAT_HASH_FORMAT_NS format("{::d}", a.table()) == "[0, 1, -1, -1]");
+  CHECK(FLAT_HASH_FORMAT_NS format("{::02d}", a.table()) == "[00, 01, -1, -1]");
+  CHECK(FLAT_HASH_FORMAT_NS format("{:l:03d}", a.table()) == "[\n\t000,\n\t001,\n\t-01,\n\t-01,\n]");
+
+  a.erase(1);
+  CHECK(FLAT_HASH_FORMAT_NS format("{}", a.table()) == "[0, -2, -1, -1]");
+}
+
 FLAT_HASH_NAMESPACE_END

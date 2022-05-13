@@ -528,6 +528,7 @@ struct FLAT_HASH_FORMAT_NS formatter<flat_hash::detail::hash_table<Container, Po
   constexpr auto parse(FLAT_HASH_FORMAT_NS basic_format_parse_context<Args...>& ctx) {
     auto [it, opts] = flat_hash::detail::parse_range_format(ctx);
     options = opts;
+    if (it == ctx.end() || *it == '}') { return it; }
 
     ctx.advance_to(it);
     auto out = subformatter.parse(ctx);
@@ -536,7 +537,7 @@ struct FLAT_HASH_FORMAT_NS formatter<flat_hash::detail::hash_table<Container, Po
     // work at compile time
     // both fmt and std parse format strings for all integrals identically
     if constexpr (assume_identical_formatters) {
-      if (!std::is_constant_evaluated()) {
+      if (!std::is_constant_evaluated()) {  // LCOV_EXCL_LINE cannot hit the other branch at runtime
         // only a trivial copy and it doesn't invoke UB as reinterpret_cast would
         empty_formatter = std::bit_cast<empty_formatter_t>(subformatter);
       }
@@ -552,11 +553,14 @@ struct FLAT_HASH_FORMAT_NS formatter<flat_hash::detail::hash_table<Container, Po
   auto format(table_type const& table, FLAT_HASH_FORMAT_NS basic_format_context<OutputIt, Char>& context) -> OutputIt {
     auto strings = flat_hash::detail::get_list_separators(options);
     return flat_hash::detail::format_range(table, context, strings, [this](auto&& value, auto& ctx) -> OutputIt {
+      // looks like formatter calls and comparisons generate large numbers of never taken branches, at least in here
+      // LCOV_EXCL_START
       if (value == table_type::npos) { return empty_formatter.format(-1, ctx); }
       if constexpr (table_type::uses_tombstones) {
         if (value == table_type::tombstone) [[unlikely]] { return empty_formatter.format(-2, ctx); }
       }
       return subformatter.format(value, ctx);
+      // LCOV_EXCL_STOP
     });
   }
 };
