@@ -39,6 +39,15 @@ struct StringMaker<T> {
   static auto convert(T const& value) -> std::string { return FLAT_HASH_FORMAT_NS format("{}", value); }
 };
 
+template <class T1, class T2>
+  requires(flat_hash::detail::formattable<T1> || flat_hash::detail::formattable<T2>)
+struct StringMaker<std::pair<T1, T2>> {
+  static auto convert(std::pair<T1, T2> const& value) -> std::string {
+    return FLAT_HASH_FORMAT_NS format("({}, {})", flat_hash::detail::maybe_format_arg(value.first),
+                                      flat_hash::detail::maybe_format_arg(value.second));
+  }
+};
+
 template <flat_hash::detail::formattable T>
 struct is_range<T> {
   static const bool value = false;
