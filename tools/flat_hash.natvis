@@ -38,6 +38,13 @@ file:///C:/Program%20Files/Microsoft%20Visual%20Studio/2022/Community/Xml/Schema
         </Expand>
     </Type>
 
+    <Type Name="flat_hash::v0::set_iterator&lt;*&gt;">
+        <DisplayString>{iter_,na}</DisplayString>
+        <Expand>
+            <ExpandedItem>iter_</ExpandedItem>
+        </Expand>
+    </Type>
+
     <Type Name="flat_hash::v0::set&lt;*&gt;">
         <DisplayString>{keys_}</DisplayString>
         <Expand>
