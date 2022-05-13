@@ -288,10 +288,6 @@ TEST_CASE("Dictionaries can be formatted", "[dictionary][format]") {
   using dict_t = inline_dictionary<int, int, InlineSize>;
   using pair_t = std::pair<typename dict_t::iterator, bool>;
 
-  STATIC_REQUIRE(detail::tuple_like<pair_t>);
-  STATIC_REQUIRE_FALSE(detail::tuple_like<bool>);
-  STATIC_REQUIRE_FALSE(detail::formattable_tuple<pair_t>);
-
   dict_t dict = {
       {1, 42},
       {2, -42},
