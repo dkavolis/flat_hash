@@ -115,3 +115,8 @@ concept unique_range = std::ranges::range<T> &&
                        (is_set<std::remove_cvref_t<T>> || is_unique_range<std::remove_cvref_t<T>>);
 
 FLAT_HASH_NAMESPACE_END
+
+template <class Key, class Traits>
+inline constexpr bool std::ranges::enable_borrowed_range<flat_hash::set<Key, Traits>> =
+    std::ranges::enable_borrowed_range<typename Traits::key_container>;  // index_vector is only used for accelerating
+                                                                         // lookup

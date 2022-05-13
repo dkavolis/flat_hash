@@ -79,3 +79,9 @@ concept unique_map = std::ranges::range<T> &&
                      (is_dictionary<std::remove_cvref_t<T>> || is_unique_map<std::remove_cvref_t<T>>);
 
 FLAT_HASH_NAMESPACE_END
+
+template <class Key, class Value, class Traits>
+inline constexpr bool std::ranges::enable_borrowed_range<flat_hash::dictionary<Key, Value, Traits>> =
+    // acts in a similar way to zipped range, std::ranges::zip_view uses conjunction so use it here as well
+    std::ranges::enable_borrowed_range<typename Traits::key_container> &&
+    std::ranges::enable_borrowed_range<typename Traits::value_container>;

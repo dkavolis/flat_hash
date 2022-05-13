@@ -570,3 +570,7 @@ template <class Container, class Policy, class Char>
   requires(flat_hash::detail::formattable<std::ranges::range_value_t<Container>>)
 struct fmt::is_range<flat_hash::detail::hash_table<Container, Policy>, Char> : std::false_type {};
 #endif
+
+template <class Container, class Policy>
+inline constexpr bool std::ranges::enable_borrowed_range<flat_hash::detail::hash_table<Container, Policy>> =
+    std::ranges::enable_borrowed_range<Container>;
