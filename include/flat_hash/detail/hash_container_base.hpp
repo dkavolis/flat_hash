@@ -407,9 +407,10 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
 
 template <class T, class Base>
 concept compatible_base =
-    std::constructible_from<Base, T> && std::same_as < typename std::remove_cvref_t<T>::probing_policy,
-typename Base::probing_policy > &&std::same_as<typename std::remove_cvref_t<T>::hasher, typename Base::hasher>&&
-                                    std::same_as<typename std::remove_cvref_t<T>::key_equal, typename Base::key_equal>;
+    std::constructible_from<Base, T> &&
+    std::same_as<typename std::remove_cvref_t<T>::probing_policy, typename Base::probing_policy> &&
+    std::same_as<typename std::remove_cvref_t<T>::hasher, typename Base::hasher> &&
+    std::same_as<typename std::remove_cvref_t<T>::key_equal, typename Base::key_equal>;
 }  // namespace detail
 
 FLAT_HASH_NAMESPACE_END
