@@ -23,6 +23,7 @@
 #pragma once
 
 #include <span>
+#include <variant>
 
 #include <catch2/catch_tostring.hpp>
 #include <catch2/matchers/catch_matchers_templated.hpp>
@@ -282,6 +283,34 @@ class IterEquals : public Catch::Matchers::MatcherGenericBase {
   }
 };
 
+template <class T1, class T2>
+class PairMatcher : public Catch::Matchers::MatcherGenericBase {
+  T1 first_;
+  T2 second_;
+
+ public:
+  PairMatcher(T1 first, T2 second) : first_(std::forward<T1>(first)), second_(std::forward<T2>(second)) {}
+
+  template <detail::pair_like P>
+  auto match(P&& pair) const -> bool {
+    return first_.match(std::get<0>(std::forward<P>(pair))) && second_.match(std::get<1>(std::forward<P>(pair)));
+  }
+
+  auto describe() const -> std::string {
+    return FLAT_HASH_FORMAT_NS format("{} and {}", first_.describe(), second_.describe());
+  }
+};
+
+struct IsTrueMatcher : public Catch::Matchers::MatcherGenericBase {
+  auto match(bool v) const noexcept -> bool { return v; }
+  auto describe() const -> std::string { return "is true"; }
+};
+
+struct IsFalseMatcher : public Catch::Matchers::MatcherGenericBase {
+  auto match(bool v) const noexcept -> bool { return !v; }
+  auto describe() const -> std::string { return "is false"; }
+};
+
 template <std::ranges::input_range R, class Alloc = std::allocator<std::ranges::range_value_t<R>>>
 [[nodiscard]] auto to_vector(R&& r, Alloc const& alloc = Alloc()) -> std::vector<std::ranges::range_value_t<R>, Alloc> {
   std::vector<std::ranges::range_value_t<R>, Alloc> vector(alloc);
@@ -375,5 +404,13 @@ template <std::ranges::range R>
 [[nodiscard]] auto IterEquals(R const& r, std::ranges::range_difference_t<R> pos) -> testing::IterEquals<R> {
   return {r, pos};
 }
+
+template <class T1, class T2>
+[[nodiscard]] auto PairMatches(T1&& first, T2&& second) -> testing::PairMatcher<T1, T2> {
+  return {std::forward<T1>(first), std::forward<T2>(second)};
+}
+
+[[nodiscard]] inline auto IsTrue() noexcept -> testing::IsTrueMatcher { return {}; }
+[[nodiscard]] inline auto IsFalse() noexcept -> testing::IsFalseMatcher { return {}; }
 
 FLAT_HASH_NAMESPACE_END
