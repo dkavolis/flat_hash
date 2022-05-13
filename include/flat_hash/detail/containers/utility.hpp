@@ -109,6 +109,14 @@ template <class T, class... Args>
       });
 }
 
+template <class T, class... Args>
+  requires constructible_from<T, Args...>
+[[nodiscard]] constexpr auto make_constructor_ref(Args&&... args) noexcept -> std::convertible_to<T> auto{
+  return deferred_constructor([&args...]() mutable noexcept(nothrow_constructible_from<T, Args...>) -> T {
+    return _construct_fn<T>{}(std::forward<Args>(args)...);
+  });
+}
+
 template <class T, class F>
   requires(std::is_invocable_r_v<T, F>)
 [[nodiscard]] constexpr auto make_constructor(F&& f) noexcept -> deferred_constructor<F> {
