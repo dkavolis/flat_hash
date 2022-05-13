@@ -3,7 +3,7 @@
 file:///C:/Program%20Files/Microsoft%20Visual%20Studio/2022/Community/Xml/Schemas/1033/natvis.xsd">
 
     <Type Name="flat_hash::v0::detail::inline_vector&lt;*&gt;">
-        <DisplayString>{{size = {count_}}}</DisplayString>
+        <DisplayString>{{ size={count_} }}</DisplayString>
         <Expand>
             <Item Name="[size]">count_</Item>
             <Item Name="[capacity]">$T2</Item>
