@@ -76,10 +76,54 @@ concept has_fallback_formatter =
 template <class T, class Char = char>
 concept formattable_impl = (has_formatter<T, fmt::format_context> || has_fallback_formatter<T, fmt::format_context>);
 
+template <class T, std::size_t N, class F>
+consteval void for_each_type(F&& function) {
+  auto expander = [&function]<std::size_t... I>(std::index_sequence<I...>) {
+    ((void)function(std::declval<std::tuple_element_t<I, std::remove_cvref_t<T>>>()), ...);
+  };
+
+  expander(std::make_index_sequence<N>{});
+}
+
+template <class T, class Pred>
+[[nodiscard]] consteval auto all_of_types(Pred pred) -> bool {
+  bool all = true;
+  for_each_type<T>([pred, &all]<class E>(E&&) { all &= pred(std::declval<E>()); });
+  return all;
+}
+
+template <class T, std::size_t N>
+concept has_tuple_element = requires { typename std::tuple_element<N, T>::type; };
+
+template <class T>
+concept tuple_like = requires {
+                       typename std::tuple_size<std::remove_cvref_t<T>>;
+                       { std::tuple_size<std::remove_cvref_t<T>>::value } -> std::convertible_to<std::size_t>;
+                     };
+
 template <class T, class Char = char>
-concept formattable = ((!std::ranges::range<T> && formattable_impl<T, Char>) ||
-                       // ranges are not formattable if values are not formattable
-                       (std::ranges::range<T> && formattable_impl<std::ranges::range_value_t<T>, Char>));
+concept formattable_tuple = requires {
+                              requires tuple_like<T>;
+                              requires all_of_types<T, std::tuple_size<std::remove_cvref_t<T>>::value>(
+                                  []<class E>(E&&) -> bool { return formattable_impl<std::remove_cvref_t<E>, Char>; });
+                            };
+
+template <class T, class Char = char>
+concept formattable =
+    requires {
+      requires !std::ranges::range<T> && !tuple_like<T>;
+      requires formattable_impl<T, Char>;
+    } ||
+    // ranges are not formattable if values are not formattable
+    requires {
+      requires std::ranges::range<T>;
+      requires formattable_impl<std::ranges::range_value_t<T>, Char>;
+    } ||
+    // structured bindings are not formattable if any of their items are not formattable
+    requires {
+      requires tuple_like<T>;
+      requires formattable_tuple<T, Char>;
+    };
 
 #else
   // clang-format off
