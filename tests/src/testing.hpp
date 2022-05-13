@@ -237,34 +237,48 @@ class Contains : public Catch::Matchers::MatcherGenericBase {
 template <std::ranges::sized_range R>
 class IterEquals : public Catch::Matchers::MatcherGenericBase {
  public:
-  using iterator = std::ranges::iterator_t<R const&>;
+  using iterator = typename R::const_iterator;
+  using difference_type = std::ranges::range_difference_t<R>;
 
  private:
   std::reference_wrapper<R const> range_;
-  iterator it_;
+  // using variant with difference type since the iterators can be invalidated by inserting/erasing elements, offset
+  // will obtain a valid iterator at the time of comparison
+  std::variant<iterator, difference_type> pos_;
   mutable iterator last_{};  // match/describe have to be const, doesn't matter as matchers are not reused
 
  public:
-  IterEquals(R const& r, iterator it) noexcept : range_(r), it_(it) {}
+  IterEquals(R const& r, iterator pos) noexcept : range_(r), pos_(pos) {}
+  IterEquals(R const& r, difference_type offset) noexcept : range_(r), pos_(offset) {}
+
+  auto expected() const -> iterator {
+    if (std::holds_alternative<iterator>(pos_)) { return std::get<iterator>(pos_); }
+    auto offset = std::get<difference_type>(pos_);
+    if (offset < 0) { offset += std::ranges::ssize(range_.get()); }
+    auto iter = std::ranges::begin(range_.get());
+    std::ranges::advance(iter, offset);
+    return iter;
+  }
 
   auto match(iterator it) const -> bool {
     last_ = it;
-    return it == it_;
+    return it == expected();
   }
 
   [[nodiscard]] auto describe() const -> std::string override {
     auto first = std::ranges::begin(range_.get());
     auto end = std::ranges::cend(range_.get());
+    auto iter = expected();
 
-    if (it_ == end || last_ == end) {
+    if (iter == end || last_ == end) {
       // cannot dereference
       return FLAT_HASH_FORMAT_NS format("matches {{?}}: <{:d}: {{?}}> == <{:d}: {{?}}>",
-                                        std::ranges::distance(first, last_), std::ranges::distance(first, it_));
+                                        std::ranges::distance(first, last_), std::ranges::distance(first, iter));
     }
 
     return FLAT_HASH_FORMAT_NS format("matches {{?}}: <{:d}: {}> == <{:d}: {}>", std::ranges::distance(first, last_),
-                                      Catch::Detail::stringify(*last_), std::ranges::distance(first, it_),
-                                      Catch::Detail::stringify(*it_));
+                                      Catch::Detail::stringify(*last_), std::ranges::distance(first, iter),
+                                      Catch::Detail::stringify(*iter));
   }
 };
 
@@ -355,6 +369,11 @@ template <class T>
 template <std::ranges::range R>
 [[nodiscard]] auto IterEquals(R const& r, std::ranges::iterator_t<R const&> iter) -> testing::IterEquals<R> {
   return {r, iter};
+}
+
+template <std::ranges::range R>
+[[nodiscard]] auto IterEquals(R const& r, std::ranges::range_difference_t<R> pos) -> testing::IterEquals<R> {
+  return {r, pos};
 }
 
 FLAT_HASH_NAMESPACE_END
