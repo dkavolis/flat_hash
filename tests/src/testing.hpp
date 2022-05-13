@@ -218,20 +218,6 @@ class Equals : public RangeMatcher<R> {
   }
 };
 
-template <class Pred>
-class AllOf : public Catch::Matchers::MatcherGenericBase {
-  Pred predicate_;
-
- public:
-  AllOf(Pred pred) noexcept : predicate_(pred) {}
-
-  template <std::ranges::input_range Range>
-  auto match(Range const& s) const -> bool {
-    return std::ranges::all_of(s, predicate_);
-  }
-  [[nodiscard]] auto describe() const -> std::string override { return "all elements satisfy predicate"; }
-};
-
 template <class T>
 class Contains : public Catch::Matchers::MatcherGenericBase {
   T value_;
@@ -359,11 +345,6 @@ template <class T, detail::equality_comparator<T> Comp = detail::equal_to>
 [[nodiscard]] auto Equals(std::initializer_list<T> r, Comp compare = {})
     -> testing::Equals<std::initializer_list<T>, Comp> {
   return {r, compare};
-}
-
-template <class Pred>
-[[nodiscard]] auto AllOf(Pred predicate) -> testing::AllOf<Pred> {
-  return {predicate};
 }
 
 template <class T>
