@@ -36,7 +36,7 @@ template <ordering_policy Policy = ordering_policy::preserved, extractable Conta
 [[nodiscard]] constexpr auto extract(Container& container, std::ranges::iterator_t<Container const> pos)
     -> std::ranges::range_value_t<Container> {
   FLAT_HASH_ASSERT(pos != std::ranges::cend(container));
-  auto value = std::ranges::iter_move(mutable_iterator(container, pos));
+  std::ranges::range_value_t<Container> value = std::ranges::iter_move(mutable_iterator(container, pos));
 
   policy_erase<Policy>(container, pos);
   return value;
