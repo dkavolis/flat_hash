@@ -32,7 +32,10 @@ FLAT_HASH_NAMESPACE_BEGIN
 namespace detail::containers {
 
 template <class Container>
-concept removable = mutable_range<Container>;
+concept removable = mutable_range<Container> ||
+                    requires(std::ranges::range_reference_t<Container> ref, std::ranges::iterator_t<Container> iter) {
+                      { ref = std::ranges::iter_move(iter) };
+                    };
 
 template <ordering_policy Policy>
 struct _policy_remove_fn;
@@ -44,6 +47,7 @@ struct _policy_remove_fn<ordering_policy::preserved> {
                             std::ranges::iterator_t<Container const> last_) const
       -> std::ranges::range_difference_t<Container> {
     using diff_t = std::ranges::range_difference_t<Container>;
+    constexpr bool lvalue_refs = std::is_lvalue_reference_v<std::ranges::range_reference_t<Container>>;
 
     if (first_ == last_) [[unlikely]] { return 0; }
 
@@ -57,10 +61,15 @@ struct _policy_remove_fn<ordering_policy::preserved> {
     auto allocator = maybe_get_allocator(container);
 
     while (target != middle && source != last) {
-      auto* ptr = std::addressof(*target);
-      destroy(allocator, *ptr);
-      construct_at(allocator, ptr, [source] { return destructive_move(*source); });
-
+      if constexpr (lvalue_refs) {
+        auto* ptr = std::addressof(*target);
+        destroy(allocator, *ptr);
+        construct_at(allocator, ptr, [source] { return destructive_move(*source); });
+      } else {
+        // possibly zipped range
+        auto out = *target;
+        out = std::ranges::iter_move(source);
+      }
       ++target;
       ++source;
     }
@@ -68,7 +77,7 @@ struct _policy_remove_fn<ordering_policy::preserved> {
     // [begin, target) now contains the final range, need to remove the remaining elements
     // [source, last) contains moved from and destroyed elements
     // [target, middle) may contain elements to remove
-    if constexpr (appendable_from_capacity<Container>) {
+    if constexpr (lvalue_refs && appendable_from_capacity<Container>) {
       if (source != last) {
         // [middle, source) contains destroyed objects, all the elements to remove have been destroyed
         std::ranges::uninitialized_move(std::ranges::subrange(source, last) |
@@ -98,6 +107,7 @@ struct _policy_remove_fn<ordering_policy::relaxed> {
                             std::ranges::iterator_t<Container const> last_) const
       -> std::ranges::range_difference_t<Container> {
     using diff_t = std::ranges::range_difference_t<Container>;
+    constexpr bool lvalue_refs = std::is_lvalue_reference_v<std::ranges::range_reference_t<Container>>;
 
     if (first_ == last_) [[unlikely]] { return 0; }
     FLAT_HASH_ASSERT(last_ > first_, "Reversed range!");
@@ -111,13 +121,18 @@ struct _policy_remove_fn<ordering_policy::relaxed> {
     while (target != middle && source != middle) {
       --source;
 
-      auto* ptr = std::addressof(*target);
-      destroy(allocator, *ptr);
-      if constexpr (appendable_from_capacity<Container>) {
-        construct_at(allocator, ptr, [source] { return destructive_move(*source); });
+      if constexpr (lvalue_refs) {
+        auto* ptr = std::addressof(*target);
+        destroy(allocator, *ptr);
+        if constexpr (appendable_from_capacity<Container>) {
+          construct_at(allocator, ptr, [source] { return destructive_move(*source); });
+        } else {
+          // no reason to destroy the moved-from object they will be destroyed by other methods
+          construct_at(allocator, ptr, [source] { return std::ranges::iter_move(source); });
+        }
       } else {
-        // no reason to destroy the moved-from object they will be destroyed by other methods
-        construct_at(allocator, ptr, [source] { return std::ranges::iter_move(source); });
+        auto out = *target;
+        out = std::ranges::iter_move(source);
       }
 
       ++target;
@@ -126,7 +141,7 @@ struct _policy_remove_fn<ordering_policy::relaxed> {
     // target == middle -> all removed elements moved to the end, source is the new end
     // source == middle -> [target, middle) contains alive elements, [middle, end(container)) - destroyed, target is the
     // new end
-    if constexpr (appendable_from_capacity<Container>) {
+    if constexpr (lvalue_refs && appendable_from_capacity<Container>) {
       if (source == middle) { destroy_range(allocator, std::ranges::subrange(target, middle)); }
     }
 
