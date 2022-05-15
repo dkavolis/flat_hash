@@ -32,10 +32,7 @@ FLAT_HASH_NAMESPACE_BEGIN
 namespace detail::containers {
 
 template <class Container>
-concept removable = mutable_range<Container> ||
-                    requires(std::ranges::range_reference_t<Container> ref, std::ranges::iterator_t<Container> iter) {
-                      { ref = std::ranges::iter_move(iter) };
-                    };
+concept removable = mutable_range<Container>;
 
 template <ordering_policy Policy>
 struct _policy_remove_fn;

@@ -32,7 +32,7 @@ FLAT_HASH_NAMESPACE_BEGIN
 namespace detail {
 
 template <class T>
-concept mutable_range = std::ranges::range<T> && std::ranges::output_range<T, std::ranges::range_value_t<T>>;
+concept mutable_range = requires { requires std::permutable<std::ranges::iterator_t<T>>; };
 
 template <class T, class... Args>
 concept brace_constructible = requires(Args... args) { T{std::forward<Args>(args)...}; };
