@@ -35,7 +35,7 @@ FLAT_HASH_NAMESPACE_BEGIN
 namespace detail::containers {
 template <class T, class Container>
 concept insertible_to = traits_insertible<Container, T> ||
-                        (std::convertible_to<T, std::ranges::range_value_t<Container>> &&
+                        (std::constructible_from<std::ranges::range_value_t<Container>, T> &&
                          back_emplaceable<Container, T>) ||
                         (std::ranges::range<T> &&
                          (appendable_to<T, Container> ||
