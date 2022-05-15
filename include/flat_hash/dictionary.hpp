@@ -119,9 +119,8 @@ struct dict_reference : public std::pair<T1, T2> {
 
   // https://github.com/ericniebler/stl2/issues/642#issuecomment-839856562
   template <class U1, class U2>
-    requires const_writable<T1, U1> && const_writable<T2, U2>
-                                     constexpr auto operator=(std::pair<U1, U2>&& other) const
-             -> dict_reference<T1, T2> const& {
+    requires(const_writable<T1, U1> && const_writable<T2, U2>)
+  constexpr auto operator=(std::pair<U1, U2>&& other) const -> dict_reference<T1, T2> const& {
     base::first = std::forward<U1>(other.first);
     base::second = std::forward<U2>(other.second);
     return *this;

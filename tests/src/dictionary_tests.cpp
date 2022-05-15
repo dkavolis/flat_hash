@@ -286,7 +286,6 @@ FLAT_HASH_TEST_CASE_SIG("Dictionary lookup tests", "[dictionary][lookup]", FLAT_
 TEST_CASE("Dictionaries can be formatted", "[dictionary][format]") {
   using FLAT_HASH_FORMAT_NS format;
   using dict_t = inline_dictionary<int, int, InlineSize>;
-  using pair_t = std::pair<typename dict_t::iterator, bool>;
 
   dict_t dict = {
       {1, 42},
