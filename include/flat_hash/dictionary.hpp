@@ -109,6 +109,28 @@ template <class T1, class T2>
   return {std::forward<T1>(first), std::forward<T2>(second)};
 }
 
+template <class Out, class T>
+concept const_writable = requires(Out&& o, T&& t) { const_cast<const Out&&>(o) = std::forward<T>(t); };
+
+// std::pair is not a valid proxy for indirectly writable iterators
+template <class T1, class T2>
+struct dict_reference : public std::pair<T1, T2> {
+  using base = std::pair<T1, T2>;
+
+  // https://github.com/ericniebler/stl2/issues/642#issuecomment-839856562
+  template <class U1, class U2>
+    requires const_writable<T1, U1> && const_writable<T2, U2>
+                                     constexpr auto operator=(std::pair<U1, U2>&& other) const
+             -> dict_reference<T1, T2> const& {
+    base::first = std::forward<U1>(other.first);
+    base::second = std::forward<U2>(other.second);
+    return *this;
+  }
+
+  using base::base;
+  using base::operator=;
+};
+
 // not a general purpose zipped iterator, assumes that both iterators always point to the same relative element in equal
 // size ranges, this allows comparisons based on only one of the iterators
 template <std::random_access_iterator KI, std::random_access_iterator VI>
@@ -123,7 +145,7 @@ class dictionary_iterator_base {
   using mapped_reference = std::iter_reference_t<VI>;
 
   using value_type = std::pair<key_type, mapped_type>;
-  using reference = std::pair<key_reference, mapped_reference>;
+  using reference = dict_reference<key_reference, mapped_reference>;
   using difference_type = std::common_type_t<std::iter_difference_t<KI>, std::iter_difference_t<VI>>;
 
   constexpr dictionary_iterator_base() noexcept = default;
