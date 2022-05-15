@@ -276,17 +276,17 @@ class mutable_dictionary_range {
 
   template <class P>
     requires(!pair_like<P> && std::constructible_from<value_type>)
-  constexpr void insert(const_iterator pos, P&& value) {
-    insert_impl(pos, value_type(value));
+  constexpr void emplace_back(P&& value) {
+    emplace_back(value_type(value));
   }
 
   template <class P>
     requires pair_like<P> && requires {
-                               requires containers::insertible_to<tuple_element_t<0, P>, K>;
-                               requires containers::insertible_to<tuple_element_t<1, P>, V>;
+                               requires containers::back_emplaceable<K, tuple_element_t<0, P>>;
+                               requires containers::back_emplaceable<V, tuple_element_t<1, P>>;
                              }
-  constexpr void insert(const_iterator pos, P&& value) {
-    insert_impl(pos, std::forward<P>(value));
+  constexpr void emplace_back(P&& value) {
+    emplace_back_impl(std::forward<P>(value));
   }
 
   // enable erase algorithms
@@ -316,9 +316,9 @@ class mutable_dictionary_range {
   V* values_;
 
   template <class P>
-  constexpr void insert_impl(const_iterator pos, P&& value) {
-    containers::insert(*keys_, pos.key_iter(), std::get<0>(std::forward<P>(value)));
-    FLAT_HASH_TRY { containers::insert(*values_, pos.value_iter(), std::get<1>(std::forward<P>(value))); }
+  constexpr void emplace_back_impl(P&& value) {
+    containers::emplace_back(*keys_, std::get<0>(std::forward<P>(value)));
+    FLAT_HASH_TRY { containers::emplace_back(*values_, std::get<1>(std::forward<P>(value))); }
     FLAT_HASH_CATCH(...) {
       containers::pop_back(*keys_);
       FLAT_HASH_THROW();
