@@ -1026,7 +1026,7 @@ class set : private detail::hash_container_base_t<Traits>,
   constexpr void rehash(size_type count)
     requires detail::mutable_range<index_container>
   {
-    base::rehash(count, keys_);
+    base::rehash(count, const_key_range());
   }
 
   /**
