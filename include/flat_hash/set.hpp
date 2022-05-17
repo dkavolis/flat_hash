@@ -1263,8 +1263,11 @@ class set : private detail::hash_container_base_t<Traits>,
     bool overfull = false;
     for (auto&& v : values) {
       std::ranges::subrange keys(first, out);
+      // MSVC in debug stores the container begin and end pointers in span iterator so the comparison will fail if the
+      // out iterator is not updated with the subrange size
+      auto decayed_keys = detail::containers::decay(keys);
       base::template try_insert_at<ordering>(
-          v, detail::containers::decay(keys), out, [&out, &v, &added, &overfull, &values, n](index_type) {
+          v, decayed_keys, decayed_keys.end(), [&out, &v, &added, &overfull, &values, n](index_type) {
             if constexpr (!detail::containers::resizable<key_container>) {
               // check that we are still within the container size
               if (added == n) [[unlikely]] {  // LCOV_EXCL_LINE
