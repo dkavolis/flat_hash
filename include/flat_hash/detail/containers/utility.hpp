@@ -293,6 +293,25 @@ template <std::ranges::range R>
   }
 }
 
+// for some unknown reasons std::span iterators are not interconvertible with GCC/MSVC even though they can be views to
+// the same container
+// https://godbolt.org/z/P4Gn5jxeE
+
+template <class T>
+concept is_span_iterator =
+    requires {
+      requires std::same_as<typename std::span<std::remove_reference_t<std::iter_reference_t<T>>>::iterator,
+                            std::remove_cvref_t<T>>;
+    };
+
+// since GCC/MSVC doesn't convert compatible span iterators, we have to use std::bit_cast to do it manually, this
+// concept checks if both types are span iterators and use compatible pointers
+template <class From, class To>
+concept span_iterator_convertible_to =
+    is_span_iterator<From> && is_span_iterator<To> &&
+    (std::same_as<From, To> ||
+     std::convertible_to<typename std::iterator_traits<From>::pointer, typename std::iterator_traits<To>::pointer>);
+
 }  // namespace detail::containers
 
 FLAT_HASH_NAMESPACE_END

@@ -152,8 +152,13 @@ class dictionary_iterator_base {
       : key_iterator_(key_iterator), value_iterator_(value_iterator) {}
   template <class K, class V>
     requires std::constructible_from<KI, K> && std::constructible_from<VI, V>
-  constexpr dictionary_iterator_base(dictionary_iterator_base<K, V> other) noexcept
+  constexpr explicit(!std::convertible_to<K, KI> && !std::convertible_to<V, VI>)
+      dictionary_iterator_base(dictionary_iterator_base<K, V> const& other) noexcept
       : key_iterator_(other.key_iterator_), value_iterator_(other.value_iterator_) {}
+  template <containers::span_iterator_convertible_to<KI> K, containers::span_iterator_convertible_to<VI> V>
+  constexpr dictionary_iterator_base(dictionary_iterator_base<K, V> const& other) noexcept
+      : key_iterator_(std::bit_cast<KI>(other.key_iterator_)),
+        value_iterator_(std::bit_cast<VI>(other.value_iterator_)) {}
 
   constexpr dictionary_iterator_base(dictionary_iterator_base const&) noexcept = default;
   constexpr dictionary_iterator_base(dictionary_iterator_base&&) noexcept = default;
@@ -220,12 +225,15 @@ class mutable_dictionary_iterator : public dictionary_iterator_base<KeyIter, Val
   using key_type = base::key_type;
   using mapped_type = base::mapped_type;
 
-  using base::advance;
   using base::base;
+  using base::operator=;
+
+  using base::advance;
   using base::decrement;
   using base::distance_to;
   using base::equals;
   using base::increment;
+
   using base::key;
   using base::key_iter;
   using base::value;
@@ -349,6 +357,7 @@ class dictionary_iterator : public detail::dictionary_iterator_base<KeyIter, Val
   using difference_type = base::difference_type;
 
   using base::base;
+  using base::operator=;
 
   [[nodiscard]] constexpr auto key() const noexcept(nothrow_dereference<KeyIter>) -> key_reference {
     return *key_iter();
@@ -434,10 +443,10 @@ class dictionary : private detail::hash_container_base_t<Traits>,
   using hash_type = base::template hash_type<Key>;
   // allocator_type...
   // keys are not mutable
-  using iterator =
-      dictionary_iterator<std::ranges::iterator_t<key_container const>, std::ranges::iterator_t<value_container>>;
-  using const_iterator =
-      dictionary_iterator<std::ranges::iterator_t<key_container const>, std::ranges::iterator_t<value_container const>>;
+  using iterator = dictionary_iterator<detail::containers::decay_iterator_t<key_container const>,
+                                       detail::containers::decay_iterator_t<value_container>>;
+  using const_iterator = dictionary_iterator<detail::containers::decay_iterator_t<key_container const>,
+                                             detail::containers::decay_iterator_t<value_container const>>;
   using value_type = iterator::value_type;
   using mutable_value_type = std::pair<key_type, mapped_type>;
   using reference = iterator::reference;
@@ -625,7 +634,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    * @return const_iterator
    */
   [[nodiscard]] constexpr auto cbegin() const noexcept -> const_iterator {
-    return const_iterator(std::ranges::cbegin(keys_), std::ranges::cbegin(values_));
+    return const_iterator(std::ranges::cbegin(key_range()), std::ranges::cbegin(value_range()));
   }
 
   /**
@@ -637,7 +646,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
     FLAT_HASH_ASSERT(std::ranges::size(keys_) == std::ranges::size(values_),
                      "Keys and values are different sizes: {} and {}", std::ranges::size(keys_),
                      std::ranges::size(values_));
-    return const_iterator(std::ranges::cend(keys_), std::ranges::cend(values_));
+    return const_iterator(std::ranges::cend(key_range()), std::ranges::cend(value_range()));
   }
 
   /**
@@ -654,7 +663,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    * @copydoc dictionary::cbegin()
    */
   [[nodiscard]] constexpr auto begin() noexcept -> iterator {
-    return iterator(std::ranges::cbegin(keys_), std::ranges::begin(values_));
+    return iterator(std::ranges::cbegin(const_key_range()), std::ranges::begin(value_range()));
   }
 
   /**
@@ -664,7 +673,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
     FLAT_HASH_ASSERT(std::ranges::size(keys_) == std::ranges::size(values_),
                      "Keys and values are different sizes: {} and {}", std::ranges::size(keys_),
                      std::ranges::size(values_));
-    return iterator(std::ranges::cend(keys_), std::ranges::end(values_));
+    return iterator(std::ranges::cend(const_key_range()), std::ranges::end(value_range()));
   }
 
   /**
@@ -1242,7 +1251,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    * @return iterator iterator to the element with the mapped value or end otherwise
    */
   [[nodiscard]] constexpr auto find(key_type const& key) noexcept -> iterator {
-    auto bucket = base::find_in(key, keys_);
+    auto bucket = base::find_in(key, key_range());
     if (bucket != base::end()) { return begin() + static_cast<difference_type>(*bucket); }
     return end();
   }
@@ -1255,7 +1264,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    */
   template <detail::hashed_lookup_key<dictionary> K>
   [[nodiscard]] constexpr auto find(K const& key) noexcept -> iterator {
-    auto bucket = base::find_in(key, keys_);
+    auto bucket = base::find_in(key, key_range());
     if (bucket != base::end()) { return begin() + static_cast<difference_type>(*bucket); }
     return end();
   }
@@ -1264,7 +1273,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    * @copydoc dictionary::find(key_type const&)
    */
   [[nodiscard]] constexpr auto find(key_type const& key) const noexcept -> const_iterator {
-    auto bucket = base::find_in(key, keys_);
+    auto bucket = base::find_in(key, key_range());
     if (bucket != base::end()) { return begin() + static_cast<difference_type>(*bucket); }
     return end();
   }
@@ -1277,7 +1286,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    */
   template <detail::hashed_lookup_key<dictionary> K>
   [[nodiscard]] constexpr auto find(K const& key) const noexcept -> const_iterator {
-    auto bucket = base::find_in(key, keys_);
+    auto bucket = base::find_in(key, key_range());
     if (bucket != base::end()) { return begin() + static_cast<difference_type>(*bucket); }
     return end();
   }
@@ -1367,7 +1376,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    * @return size_type index to the hash table bucket
    */
   [[nodiscard]] constexpr auto bucket(key_type const& key) const noexcept -> size_type {
-    return static_cast<size_type>(base::find_in(key, keys_) - base::begin());
+    return static_cast<size_type>(base::find_in(key, key_range()) - base::begin());
   }
 
   /**
@@ -1378,7 +1387,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    */
   template <detail::hashed_lookup_key<dictionary> K>
   [[nodiscard]] constexpr auto bucket(K const& key) const noexcept -> size_type {
-    return static_cast<size_type>(base::find_in(key, keys_) - base::begin());
+    return static_cast<size_type>(base::find_in(key, key_range()) - base::begin());
   }
 
   // Hash policy
@@ -1405,7 +1414,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
   constexpr void rehash(size_type count)
     requires detail::mutable_range<index_container>
   {
-    base::rehash(count, keys_);
+    base::rehash(count, const_key_range());
   }
 
   /**
@@ -1514,6 +1523,14 @@ class dictionary : private detail::hash_container_base_t<Traits>,
 
   using mutable_range_type = detail::mutable_dictionary_range<key_container, value_container>;
 
+  [[nodiscard]] constexpr auto key_range() noexcept -> decltype(auto) { return detail::containers::decay(keys_); }
+  [[nodiscard]] constexpr auto key_range() const noexcept -> decltype(auto) { return detail::containers::decay(keys_); }
+  [[nodiscard]] constexpr auto const_key_range() const noexcept -> decltype(auto) { return key_range(); }
+  [[nodiscard]] constexpr auto value_range() noexcept -> decltype(auto) { return detail::containers::decay(values_); }
+  [[nodiscard]] constexpr auto value_range() const noexcept -> decltype(auto) {
+    return detail::containers::decay(values_);
+  }
+
   [[nodiscard]] constexpr auto mutable_range() noexcept -> mutable_range_type {
     return mutable_range_type(keys_, values_);
   }
@@ -1540,8 +1557,10 @@ class dictionary : private detail::hash_container_base_t<Traits>,
     bool overfull = false;
     for (auto&& pair : values) {
       std::ranges::subrange keys(first.key_iter(), out.key_iter());
+      auto decayed_keys = detail::containers::decay(keys);
       base::template try_insert_at<ordering>(
-          std::get<0>(pair), keys, out.key_iter(), [&out, &pair, &added, &overfull, &values, n](index_type) {
+          std::get<0>(pair), decayed_keys, decayed_keys.end(),
+          [&out, &pair, &added, &overfull, &values, n](index_type) {
             if constexpr (!detail::containers::resizable<key_container>) {
               // check that we are still within the container size
               if (added == n) [[unlikely]] {  // LCOV_EXCL_LINE
@@ -1581,7 +1600,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
     FLAT_HASH_ASSERT(offset <= ssize(), "Iterator past the end: {} <= {}", offset, ssize());
 
     auto [index, inserted] = base::template try_insert_at<ordering>(
-        std::get<0>(value), keys_, pos.key_iter(), [this, &value, offset](index_type) {
+        std::get<0>(value), const_key_range(), pos.key_iter(), [this, &value, offset](index_type) {
           auto out = mutable_range();
           auto iter = out.begin() + offset;
           detail::containers::policy_insert<ordering>(out, iter, std::forward<K>(value));
@@ -1611,7 +1630,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
   template <class K>
   constexpr auto extract_impl(K const& key) -> std::optional<mutable_value_type> {
     std::optional<mutable_value_type> value = std::nullopt;
-    base::template try_erase<ordering>(keys_, key, [this, &value](index_type index) {
+    base::template try_erase<ordering>(const_key_range(), key, [this, &value](index_type index) {
       auto out = mutable_range();
       auto pos = out.begin() + static_cast<difference_type>(index);
       value = detail::containers::extract<ordering>(out, pos);
@@ -1621,7 +1640,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
 
   constexpr auto extract_impl(const_iterator pos) -> mutable_value_type {
     std::optional<mutable_value_type> value = std::nullopt;
-    base::template try_erase<ordering>(keys_, pos.key_iter(), [this, &value](index_type index) {
+    base::template try_erase<ordering>(const_key_range(), pos.key_iter(), [this, &value](index_type index) {
       auto out = mutable_range();
       auto iter = out.begin() + static_cast<difference_type>(index);
       value = detail::containers::extract<ordering>(out, iter);
@@ -1658,7 +1677,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
         }
       }
 
-      base::ensure_load_factor(keys_, 0, true);
+      base::ensure_load_factor(const_key_range(), 0, true);
     }
     FLAT_HASH_CATCH(...) {
       // erasing from the end is much less likely to throw if it does
@@ -1693,7 +1712,8 @@ class dictionary : private detail::hash_container_base_t<Traits>,
         reserve(size() + std::ranges::size(range));
       } else {
         // don't need to be strict about hash table size if the range can have duplicates
-        base::ensure_load_factor(keys_, /* extra = */ std::ranges::size(range), /* strict = */ unique_range<R>);
+        base::ensure_load_factor(const_key_range(), /* extra = */ std::ranges::size(range),
+                                 /* strict = */ unique_range<R>);
       }
     }
   }
