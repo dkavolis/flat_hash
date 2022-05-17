@@ -215,7 +215,7 @@ class set : private detail::hash_container_base_t<Traits>,
   using hash_type = base::template hash_type<Key>;
   // allocator_type...
   // keys are not mutable
-  using iterator = set_iterator<std::ranges::iterator_t<key_container const>>;
+  using iterator = set_iterator<detail::containers::decay_iterator_t<key_container const>>;
   using const_iterator = iterator;
   using reference = iterator::reference;
   using const_reference = reference;
@@ -459,14 +459,14 @@ class set : private detail::hash_container_base_t<Traits>,
    *
    * @return const_iterator
    */
-  [[nodiscard]] constexpr auto cbegin() const noexcept -> const_iterator { return std::ranges::cbegin(keys_); }
+  [[nodiscard]] constexpr auto cbegin() const noexcept -> const_iterator { return std::ranges::cbegin(key_range()); }
 
   /**
    * @brief Iterator the end of the stored keys.
    *
    * @return const_iterator
    */
-  [[nodiscard]] constexpr auto cend() const noexcept -> const_iterator { return std::ranges::cend(keys_); }
+  [[nodiscard]] constexpr auto cend() const noexcept -> const_iterator { return std::ranges::cend(key_range()); }
 
   /**
    * @copydoc set::cbegin()
@@ -907,7 +907,7 @@ class set : private detail::hash_container_base_t<Traits>,
    * @return const_iterator iterator to the element with key value or end otherwise
    */
   [[nodiscard]] constexpr auto find(key_type const& key) const noexcept -> const_iterator {
-    auto bucket = base::find_in(key, keys_);
+    auto bucket = base::find_in(key, key_range());
     if (bucket != base::end()) { return begin() + static_cast<difference_type>(*bucket); }
     return end();
   }
@@ -920,7 +920,7 @@ class set : private detail::hash_container_base_t<Traits>,
    */
   template <detail::hashed_lookup_key<set> K>
   [[nodiscard]] constexpr auto find(K const& key) const noexcept -> const_iterator {
-    auto bucket = base::find_in(key, keys_);
+    auto bucket = base::find_in(key, key_range());
     if (bucket != base::end()) { return begin() + static_cast<difference_type>(*bucket); }
     return end();
   }
@@ -988,7 +988,7 @@ class set : private detail::hash_container_base_t<Traits>,
    * @return size_type index to the hash table bucket
    */
   [[nodiscard]] constexpr auto bucket(key_type const& key) const noexcept -> size_type {
-    return static_cast<size_type>(base::find_in(key, keys_) - base::begin());
+    return static_cast<size_type>(base::find_in(key, key_range()) - base::begin());
   }
 
   /**
@@ -999,7 +999,7 @@ class set : private detail::hash_container_base_t<Traits>,
    */
   template <detail::hashed_lookup_key<set> K>
   [[nodiscard]] constexpr auto bucket(K const& key) const noexcept -> size_type {
-    return static_cast<size_type>(base::find_in(key, keys_) - base::begin());
+    return static_cast<size_type>(base::find_in(key, key_range()) - base::begin());
   }
 
   // Hash policy
@@ -1240,6 +1240,10 @@ class set : private detail::hash_container_base_t<Traits>,
   key_container keys_;
   FLAT_HASH_NO_UNIQUE_ADDRESS detail::maybe_empty<Traits> traits_{};
 
+  [[nodiscard]] constexpr auto key_range() noexcept -> decltype(auto) { return detail::containers::decay(keys_); }
+  [[nodiscard]] constexpr auto key_range() const noexcept -> decltype(auto) { return detail::containers::decay(keys_); }
+  [[nodiscard]] constexpr auto const_key_range() const noexcept -> decltype(auto) { return key_range(); }
+
   /**
    * @brief Directly assign values to key_container if the container is not back_emplaceable, mostly useful for fixed
    * size containers. Asserts on too few or too many unique values assigned.
@@ -1254,7 +1258,7 @@ class set : private detail::hash_container_base_t<Traits>,
     [[maybe_unused]] size_type n = std::ranges::size(keys_);
 
     index_type added = 0;
-    auto const first = std::ranges::begin(keys_);
+    auto const first = std::ranges::begin(key_range());
     auto out = first;
     bool overfull = false;
     for (auto&& v : values) {
@@ -1298,7 +1302,8 @@ class set : private detail::hash_container_base_t<Traits>,
     FLAT_HASH_ASSERT(offset <= std::ranges::ssize(keys_), "Iterator past the end");
 
     auto [index, inserted] =
-        base::template try_insert_at<ordering>(key, keys_, pos.base(), [this, &key, iter = pos.base()](index_type) {
+        base::template try_insert_at<ordering>(key, const_key_range(), pos.base(), [this, &key](index_type i) {
+          auto iter = std::ranges::cbegin(keys_) + static_cast<difference_type>(i);
           detail::containers::policy_insert<ordering>(keys_, iter, std::forward<K>(key));
         });
 
@@ -1316,7 +1321,7 @@ class set : private detail::hash_container_base_t<Traits>,
   template <class K>
   constexpr auto extract_impl(K const& key) -> std::optional<value_type> {
     std::optional<value_type> value = std::nullopt;
-    base::template try_erase<ordering>(keys_, key, [this, &value](index_type index) {
+    base::template try_erase<ordering>(const_key_range(), key, [this, &value](index_type index) {
       auto pos = std::ranges::cbegin(keys_) + static_cast<difference_type>(index);
       value = detail::containers::extract<ordering>(keys_, pos);
     });
@@ -1325,7 +1330,7 @@ class set : private detail::hash_container_base_t<Traits>,
 
   constexpr auto extract_impl(const_iterator pos) -> value_type {
     std::optional<value_type> value = std::nullopt;
-    base::template try_erase<ordering>(keys_, pos.base(), [this, &value](index_type index) {
+    base::template try_erase<ordering>(const_key_range(), pos.base(), [this, &value](index_type index) {
       auto iter = std::ranges::cbegin(keys_) + static_cast<difference_type>(index);
       value = detail::containers::extract<ordering>(keys_, iter);
     });
@@ -1336,7 +1341,7 @@ class set : private detail::hash_container_base_t<Traits>,
     requires(detail::hashed_lookup_key<K, set> || detail::hashed_lookup_key<Key, set<K, Opts>>)
   [[nodiscard]] constexpr auto is_subset_of(set<K, Opts> const& rhs) const noexcept -> bool {
     if constexpr (detail::hashed_lookup_key<Key, set<K, Opts>>) {
-      return std::ranges::all_of(keys_, [&rhs](key_type const& key) -> bool { return rhs.contains(key); });
+      return std::ranges::all_of(key_range(), [&rhs](key_type const& key) -> bool { return rhs.contains(key); });
     } else {
       // slow path
       size_type expected = size();
@@ -1419,7 +1424,7 @@ class set : private detail::hash_container_base_t<Traits>,
         reserve(size() + std::ranges::size(range));
       } else {
         // don't need to be strict about hash table size if the range can have duplicates
-        base::ensure_load_factor(keys_, /* extra = */ std::ranges::size(range), /* strict = */ unique_range<R>);
+        base::ensure_load_factor(key_range(), /* extra = */ std::ranges::size(range), /* strict = */ unique_range<R>);
       }
     }
   }
