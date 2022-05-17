@@ -277,13 +277,14 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
     requires(valid_key<Key, std::ranges::range_value_t<Keys>, hasher, key_equal>)
   constexpr auto try_insert_at(Key const& key, Keys const& keys, std::ranges::iterator_t<Keys const&> pos,
                                OnInsert on_insert) -> std::pair<index_type, bool> {
-    if (table_.bucket_count() == 0) [[unlikely]] { table_.resize_at_least(hash_table_type::default_size); }
+    // make sure we have sufficient space in the table for insertion before finding the insertion spot, otherwise it may
+    // be invalidated if the table grows
+    ensure_load_factor(keys, 1);
     auto [table_pos, info] = table_.find_insertion_bucket(hash(key), item_equality_predicate(keys, key, key_eq()));
     auto offset = static_cast<index_type>(pos - std::ranges::cbegin(keys));
     auto size = static_cast<index_type>(std::ranges::size(keys));
     const_iterator swap_iter;
     if (info) {
-      ensure_load_factor(keys, 1);
       if constexpr (Ordering == ordering_policy::relaxed) {
         if (pos != std::ranges::cend(keys)) { swap_iter = find_at(containers::at(keys, offset), offset); }
       }
