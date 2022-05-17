@@ -234,8 +234,8 @@ class mutable_dictionary_iterator : public dictionary_iterator_base<KeyIter, Val
   // need to specialize iter_move so that the referenced values can be moved, otherwise the pair assignment operator
   // will only forward based on the pair template types
   [[nodiscard]] friend constexpr auto iter_move(mutable_dictionary_iterator const& iter) noexcept(
-      nothrow_dereference<KeyIter>&& nothrow_dereference<ValueIter>) -> std::pair<key_type&&, mapped_type&&> {
-    return {std::ranges::iter_move(iter.key_iter()), std::ranges::iter_move(iter.value_iter())};
+      nothrow_dereference<KeyIter>&& nothrow_dereference<ValueIter>) -> decltype(auto) {
+    return forward_as_pair(std::ranges::iter_move(iter.key_iter()), std::ranges::iter_move(iter.value_iter()));
   }
 
   // same for iter_swap
@@ -339,7 +339,7 @@ class dictionary_iterator : public detail::dictionary_iterator_base<KeyIter, Val
                             public iterator_facade<dictionary_iterator<KeyIter, ValueIter>> {
  public:
   using base = detail::dictionary_iterator_base<KeyIter, ValueIter>;
-  using key_type = base::key_type const;
+  using key_type = base::key_type;  // no reason to add const as unlike std::unordered_set keys are not stored in nodes
   using key_reference = detail::add_const_if_ref_t<typename base::key_reference>;
   using mapped_type = base::mapped_type;
   using mapped_reference = base::mapped_reference;
@@ -376,8 +376,8 @@ class dictionary_iterator : public detail::dictionary_iterator_base<KeyIter, Val
   // exposed keys are immutable
 
   [[nodiscard]] friend constexpr auto iter_move(dictionary_iterator const& iter) noexcept(
-      nothrow_dereference<KeyIter>&& nothrow_dereference<ValueIter>) -> std::pair<key_reference, mapped_type&&> {
-    return std::make_pair(iter.key(), std::ranges::iter_move(iter.value_iter()));
+      nothrow_dereference<KeyIter>&& nothrow_dereference<ValueIter>) -> decltype(auto) {
+    return detail::forward_as_pair(iter.key(), std::ranges::iter_move(iter.value_iter()));
   }
 
   friend constexpr void iter_swap(dictionary_iterator const& lhs, dictionary_iterator const& rhs) noexcept(

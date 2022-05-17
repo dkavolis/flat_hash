@@ -492,9 +492,9 @@ void test_hashed_table_expands(std::initializer_list<typename Hashed::value_type
   CHECK_THAT(h, ContainsAllOf(init) && ContainsAllOf(extra));
 }
 
-template <class Hashed, class Proj = std::identity>
+template <class Hashed>
 void test_hashed_merge(std::initializer_list<typename Hashed::value_type> init,
-                       std::initializer_list<typename Hashed::value_type> extra, Proj proj = {}) {
+                       std::initializer_list<typename Hashed::value_type> extra) {
   Hashed a = init;
   Hashed b = extra;
   b.insert(init);
@@ -512,9 +512,8 @@ void test_hashed_merge(std::initializer_list<typename Hashed::value_type> init,
   }
 
   SECTION("merging with a range of duplicate values results ignores duplicates") {
-    auto projected = b | std::views::transform(proj);
-    std::vector values(projected.begin(), projected.end());
-    values.insert(values.cend(), projected.begin(), projected.end());
+    std::vector values(b.begin(), b.end());
+    values.insert(values.cend(), b.begin(), b.end());
     a.merge(values);
     CHECK(a.size() == init.size() + extra.size());
     CHECK_THAT(a, ContainsAllOf(init) && ContainsAllOf(extra));

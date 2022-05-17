@@ -63,16 +63,8 @@ struct hetero_value_proj {
   }
 };
 
-struct mutable_proj {
-  template <class T1, class T2>
-  [[nodiscard]] constexpr auto operator()(std::pair<T1, T2> const& pair) const
-      -> std::pair<std::remove_cvref_t<T1>, std::remove_cvref_t<T2>> {
-    return {pair.first, pair.second};
-  }
-};
-
 [[nodiscard]] static auto testing_lists() {
-  using value_type = std::pair<key_type const, mapped_type>;
+  using value_type = std::pair<key_type, mapped_type>;
   static std::initializer_list<value_type> a = {{"1", "11"}, {"2", "22"}, {"3", "33"}, {"4", "44"}};
   static std::initializer_list<value_type> duplicates = {{"1", "11"}, {"2", "22"}, {"1", "11"},
                                                          {"3", "33"}, {"2", "22"}, {"4", "44"}};
@@ -350,7 +342,7 @@ FLAT_HASH_DYNAMIC_DICTIONARY_TEST_CASE("Values can be emplaced into dictionaries
   }
 
   SECTION("try_emplace returns an iterator to the element preventing insertion and does not move its arguments") {
-    auto [k, v] = mutable_proj{}(*init.begin());
+    auto [k, v] = *init.begin();
     CHECK_THAT(h.try_emplace(std::move(k), std::move(v)), PairMatches(IterEquals(h, 0), IsFalse()));
     CHECK(k == init.begin()->first);
     CHECK(v == init.begin()->second);
@@ -365,7 +357,7 @@ FLAT_HASH_DYNAMIC_DICTIONARY_TEST_CASE("Values can be emplaced into dictionaries
   SECTION(
       "try_emplace with a specified positions returns an iterator to the element preventing insertion and does not "
       "move its arguments") {
-    auto [k, v] = mutable_proj{}(*init.begin());
+    auto [k, v] = *init.begin();
     auto offset = GENERATE_COPY(range(0 * ssize, ssize));
     CHECK_THAT(h.try_emplace(h.cbegin() + offset, std::move(k), std::move(v)), IterEquals(h, 0));
     CHECK(k == init.begin()->first);
@@ -381,7 +373,7 @@ TEST_CASE("Dictionaries expand when load factor is exceeded", "[dictionary][expa
 
 FLAT_HASH_DYNAMIC_DICTIONARY_TEST_CASE("Dictionaries can be merged", "[dictionary][merge]", key_type, mapped_type) {
   auto [a, b, dups] = testing_lists();
-  testing::test_hashed_merge<TestType>(a, b, mutable_proj{});
+  testing::test_hashed_merge<TestType>(a, b);
 }
 
 FLAT_HASH_DYNAMIC_DICTIONARY_TEST_CASE("Dictionaries can be spliced", "[dictionary][splice]", key_type, mapped_type) {
