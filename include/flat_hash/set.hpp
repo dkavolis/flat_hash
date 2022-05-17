@@ -1263,27 +1263,28 @@ class set : private detail::hash_container_base_t<Traits>,
     bool overfull = false;
     for (auto&& v : values) {
       std::ranges::subrange keys(first, out);
-      base::template try_insert_at<ordering>(v, keys, out, [&out, &v, &added, &overfull, &values, n](index_type) {
-        if constexpr (!detail::containers::resizable<key_container>) {
-          // check that we are still within the container size
-          if (added == n) [[unlikely]] {  // LCOV_EXCL_LINE
-            FLAT_HASH_ASSERT(false, "Tried to add more unique values than the container could hold ({:d}): {}", n,
-                             detail::maybe_format_arg(values));
-            overfull = true;
-            return false;  // don't add
-          }
-        }
+      base::template try_insert_at<ordering>(
+          v, detail::containers::decay(keys), out, [&out, &v, &added, &overfull, &values, n](index_type) {
+            if constexpr (!detail::containers::resizable<key_container>) {
+              // check that we are still within the container size
+              if (added == n) [[unlikely]] {  // LCOV_EXCL_LINE
+                FLAT_HASH_ASSERT(false, "Tried to add more unique values than the container could hold ({:d}): {}", n,
+                                 detail::maybe_format_arg(values));
+                overfull = true;
+                return false;  // don't add
+              }
+            }
 
-        if constexpr (std::ranges::borrowed_range<R>) {
-          *out = v;
-        } else {
-          *out = std::move(v);
-        }
+            if constexpr (std::ranges::borrowed_range<R>) {
+              *out = v;
+            } else {
+              *out = std::move(v);
+            }
 
-        ++out;
-        ++added;
-        return true;
-      });
+            ++out;
+            ++added;
+            return true;
+          });
 
       if (overfull) [[unlikely]] { break; }  // LCOV_EXCL_LINE from assertion
     }
@@ -1389,7 +1390,7 @@ class set : private detail::hash_container_base_t<Traits>,
         }
       }
 
-      base::ensure_load_factor(keys_, 0, true);
+      base::ensure_load_factor(const_key_range(), 0, true);
     }
     FLAT_HASH_CATCH(...) {
       // erasing from the end is much less likely to throw if it does
@@ -1424,7 +1425,8 @@ class set : private detail::hash_container_base_t<Traits>,
         reserve(size() + std::ranges::size(range));
       } else {
         // don't need to be strict about hash table size if the range can have duplicates
-        base::ensure_load_factor(key_range(), /* extra = */ std::ranges::size(range), /* strict = */ unique_range<R>);
+        base::ensure_load_factor(const_key_range(), /* extra = */ std::ranges::size(range),
+                                 /* strict = */ unique_range<R>);
       }
     }
   }
