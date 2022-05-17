@@ -249,7 +249,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
     }
   }
 
-  template <std::ranges::random_access_range Keys>
+  template <std::ranges::sized_range Keys>
     requires hash_for<hasher, std::ranges::range_value_t<Keys>>
   constexpr auto ensure_load_factor(Keys const& keys, size_type extra, bool strict = true) -> bool {
     size_type n = std::ranges::size(keys) + extra;
@@ -275,8 +275,8 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
   template <ordering_policy Ordering, class Key, std::ranges::random_access_range Keys,
             std::invocable<index_type> OnInsert>
     requires(valid_key<Key, std::ranges::range_value_t<Keys>, hasher, key_equal>)
-  constexpr auto try_insert_at(Key const& key, Keys& keys, std::ranges::iterator_t<Keys const&> pos, OnInsert on_insert)
-      -> std::pair<index_type, bool> {
+  constexpr auto try_insert_at(Key const& key, Keys const& keys, std::ranges::iterator_t<Keys const&> pos,
+                               OnInsert on_insert) -> std::pair<index_type, bool> {
     if (table_.bucket_count() == 0) [[unlikely]] { table_.resize_at_least(hash_table_type::default_size); }
     auto [table_pos, info] = table_.find_insertion_bucket(hash(key), item_equality_predicate(keys, key, key_eq()));
     auto offset = static_cast<index_type>(pos - std::ranges::cbegin(keys));
@@ -295,7 +295,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
   template <ordering_policy Ordering, std::ranges::random_access_range Keys, std::invocable<index_type> OnErase,
             class Key = std::ranges::range_value_t<Keys>>
     requires(valid_key<Key, std::ranges::range_value_t<Keys>, hasher, key_equal>)
-  constexpr auto try_erase(Keys& keys, Key const& key, OnErase on_erase) -> bool {
+  constexpr auto try_erase(Keys const& keys, Key const& key, OnErase on_erase) -> bool {
     auto iter = find_in(key, keys);
     if (iter == end()) { return false; }
     auto keys_count = static_cast<index_type>(std::ranges::size(keys));
@@ -308,7 +308,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
 
   template <ordering_policy Ordering, std::ranges::random_access_range Keys, std::invocable<index_type> OnErase>
     requires hash_for<hasher, std::ranges::range_value_t<Keys>>
-  constexpr auto try_erase(Keys& keys, std::ranges::iterator_t<Keys const&> pos, OnErase on_erase) -> bool {
+  constexpr auto try_erase(Keys const& keys, std::ranges::iterator_t<Keys const&> pos, OnErase on_erase) -> bool {
     auto offset = pos - std::ranges::cbegin(keys);
     auto i = static_cast<index_type>(offset);
     auto iter = find_at(*pos, i);
