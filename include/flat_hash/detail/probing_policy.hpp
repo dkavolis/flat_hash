@@ -94,7 +94,7 @@ struct probing_info_type<T, R> {
 template <class T, class R>
 using probing_info_t = probing_info_type<T, R>::type;
 
-template <class T, class R = std::vector<std::uint32_t>>
+template <class T, class R = std::span<std::uint32_t>>
 concept probing_policy = std::semiregular<T> && prober_for<T, R> &&
                          requires(T const& policy, std::uint64_t hash) {
                            { policy.reserved_bits() } noexcept -> std::unsigned_integral;

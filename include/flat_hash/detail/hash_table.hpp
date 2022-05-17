@@ -39,8 +39,11 @@ FLAT_HASH_NAMESPACE_BEGIN
 
 namespace detail {
 
+template <class P, class C>
+concept decayed_probing_policy = requires { requires probing::probing_policy<P, containers::decay_reference_t<C>>; };
+
 template <index_range Container = std::vector<std::uint32_t>,
-          probing::probing_policy<Container> Policy = probing::robin_hood>
+          decayed_probing_policy<Container> Policy = probing::robin_hood>
 class hash_table;
 
 constexpr static auto always_false = [](std::integral auto) noexcept { return false; };
@@ -76,21 +79,100 @@ enum struct found {
 };
 
 /**
+ * @brief A wrapper over Container::(const_)iterator for easier checking if the bucket holds anything and
+ * dereferencing
+ */
+template <std::random_access_iterator It, class Policy>
+class table_iterator : public iterator_facade<table_iterator<It, Policy>> {
+ public:
+  using base_iterator = It;
+  using policy = Policy;
+  using value_type = std::iter_value_t<It>;
+  using reference = value_type;
+  using difference_type = std::iter_difference_t<It>;
+
+  constexpr static bool uses_tombstones = !probing::disable_tombstones_v<Policy>;
+  constexpr static value_type npos = empty_bucket_v<value_type>;
+  constexpr static value_type tombstone = uses_tombstones ? tombstone_v<value_type> : npos;
+
+  constexpr table_iterator() noexcept(std::is_nothrow_constructible_v<base_iterator>) = default;
+  constexpr table_iterator(base_iterator it,
+                           policy const* p) noexcept(std::is_nothrow_move_constructible_v<base_iterator>)
+      : it_(std::move(it)), policy_(p) {}
+  template <class U>
+    requires std::constructible_from<base_iterator, U>
+  constexpr table_iterator(U it, policy const* p) noexcept(noexcept(base_iterator(it))) : it_(it), policy_(p) {}
+
+  [[nodiscard]] constexpr auto is_empty() const noexcept(nothrow_dereference<base_iterator>) -> bool {
+    return *it_ == npos;
+  }
+  [[nodiscard]] constexpr auto is_unused() const noexcept(nothrow_dereference<base_iterator>) -> bool {
+    return *it_ >= tombstone;
+  }
+  [[nodiscard]] constexpr auto holds_value() const noexcept(nothrow_dereference<base_iterator>) -> bool {
+    return !is_unused();
+  }
+
+  [[nodiscard]] constexpr auto raw() const noexcept(nothrow_dereference<base_iterator>) -> reference { return *it_; }
+  [[nodiscard]] constexpr auto decoded() const noexcept(nothrow_dereference<base_iterator>) -> reference {
+    return policy_->decode(*it_);
+  }
+
+  [[nodiscard]] constexpr auto dereference() const noexcept(nothrow_dereference<base_iterator>) -> reference {
+    FLAT_HASH_ASSERT(policy_ != nullptr, "Cannot decode value with null policy");
+    return holds_value() ? decoded() : raw();
+  }
+  constexpr void increment() noexcept(nothrow_increment<base_iterator>) { ++it_; }
+  constexpr void decrement() noexcept(nothrow_decrement<base_iterator>) { --it_; }
+
+  template <std::sentinel_for<base_iterator> S>
+  [[nodiscard]] constexpr auto equals(S const& other) const noexcept(nothrow_equals<base_iterator, S>) -> bool {
+    return it_ == other;
+  }
+  [[nodiscard]] constexpr auto equals(table_iterator other) const noexcept(nothrow_equals<base_iterator>) -> bool {
+    return it_ == other.it_;
+  }
+
+  template <std::sized_sentinel_for<base_iterator> S>
+  [[nodiscard]] constexpr auto distance_to(S const& lhs) const noexcept(nothrow_distance_to<base_iterator, S>)
+      -> difference_type {
+    return lhs - it_;
+  }
+  [[nodiscard]] constexpr auto distance_to(table_iterator lhs) const noexcept(nothrow_distance_to<base_iterator>)
+      -> difference_type {
+    return lhs.it_ - it_;
+  }
+
+  constexpr void advance(difference_type n) noexcept(nothrow_advance<base_iterator>) { it_ += n; }
+
+  [[nodiscard]] constexpr operator base_iterator() const noexcept(std::is_nothrow_copy_constructible_v<base_iterator>) {
+    return it_;
+  }
+
+ private:
+  base_iterator it_;
+  policy const* policy_;
+};
+
+/**
  * @brief A wrapper over a container for use as a hash table
  *
- * @tparam Container A resizable random-access container of unsigned integrals
+ * @tparam Container A mutable random-access container of unsigned integrals
  */
-template <index_range Container, probing::probing_policy<Container> Policy>
+template <index_range Container, decayed_probing_policy<Container> Policy>
 class hash_table : public containers::maybe_enable_allocator_type<Container> {
-  template <index_range C, probing::probing_policy<C>>
+  template <index_range C, decayed_probing_policy<C>>
   friend class hash_table;
 
  public:
   using value_type = std::ranges::range_value_t<Container>;
+  using reference = value_type;
   using difference_type = std::ranges::range_difference_t<Container>;
   using policy = Policy;
-  using probing_iterator = probing::iterator_t<policy, Container>;
-  using probing_info = probing::probing_info_t<policy, Container>;
+  using probing_iterator = probing::iterator_t<policy, containers::decay_reference_t<Container const>>;
+  using probing_info = probing::probing_info_t<policy, containers::decay_reference_t<Container const>>;
+  using iterator = table_iterator<containers::decay_iterator_t<Container const>, Policy>;
+  using const_iterator = iterator;
 
   constexpr static bool uses_tombstones = !probing::disable_tombstones_v<Policy>;
 
@@ -110,82 +192,11 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   constexpr static std::uint64_t default_size = 32;
 
   /**
-   * @brief A wrapper over Container::(const_)iterator for easier checking if the bucket holds anything and
-   * dereferencing
-   */
-  class iterator
-      : public iterator_facade<iterator, std::contiguous_iterator<std::ranges::iterator_t<Container const>>> {
-   public:
-    using base_iterator = std::ranges::iterator_t<Container const>;
-    using reference = value_type;
-
-    constexpr iterator() noexcept(std::is_nothrow_constructible_v<base_iterator>) = default;
-    constexpr iterator(base_iterator it, policy const* p) noexcept(std::is_nothrow_move_constructible_v<base_iterator>)
-        : it_(std::move(it)), policy_(p) {}
-    template <class U>
-      requires std::constructible_from<base_iterator, U>
-    constexpr iterator(U it, policy const* p) noexcept(noexcept(base_iterator(it))) : it_(it), policy_(p) {}
-
-    [[nodiscard]] constexpr auto is_empty() const noexcept(nothrow_dereference<base_iterator>) -> bool {
-      return *it_ == npos;
-    }
-    [[nodiscard]] constexpr auto is_unused() const noexcept(nothrow_dereference<base_iterator>) -> bool {
-      return *it_ >= tombstone;
-    }
-    [[nodiscard]] constexpr auto holds_value() const noexcept(nothrow_dereference<base_iterator>) -> bool {
-      return !is_unused();
-    }
-
-    [[nodiscard]] constexpr auto raw() const noexcept(nothrow_dereference<base_iterator>) -> reference { return *it_; }
-    [[nodiscard]] constexpr auto decoded() const noexcept(nothrow_dereference<base_iterator>) -> reference {
-      return policy_->decode(*it_);
-    }
-
-    [[nodiscard]] constexpr auto dereference() const noexcept(nothrow_dereference<base_iterator>) -> reference {
-      FLAT_HASH_ASSERT(policy_ != nullptr, "Cannot decode value with null policy");
-      return holds_value() ? decoded() : raw();
-    }
-    constexpr void increment() noexcept(nothrow_increment<base_iterator>) { ++it_; }
-    constexpr void decrement() noexcept(nothrow_decrement<base_iterator>) { --it_; }
-
-    template <std::sentinel_for<base_iterator> S>
-    [[nodiscard]] constexpr auto equals(S const& other) const noexcept(nothrow_equals<base_iterator, S>) -> bool {
-      return it_ == other;
-    }
-    [[nodiscard]] constexpr auto equals(iterator other) const noexcept(nothrow_equals<base_iterator>) -> bool {
-      return it_ == other.it_;
-    }
-
-    template <std::sized_sentinel_for<base_iterator> S>
-    [[nodiscard]] constexpr auto distance_to(S const& lhs) const noexcept(nothrow_distance_to<base_iterator, S>)
-        -> difference_type {
-      return lhs - it_;
-    }
-    [[nodiscard]] constexpr auto distance_to(iterator lhs) const noexcept(nothrow_distance_to<base_iterator>)
-        -> difference_type {
-      return lhs.it_ - it_;
-    }
-
-    constexpr void advance(difference_type n) noexcept(nothrow_advance<base_iterator>) { it_ += n; }
-
-    [[nodiscard]] constexpr operator base_iterator() const
-        noexcept(std::is_nothrow_copy_constructible_v<base_iterator>) {
-      return it_;
-    }
-
-   private:
-    base_iterator it_;
-    policy const* policy_;
-  };
-
-  using const_iterator = iterator;
-
-  /**
    * @brief Default constructor, will avoid allocations unless Container or Policy allocate in default constructors
    */
   constexpr hash_table() noexcept(
       std::is_nothrow_default_constructible_v<Container>&& std::is_nothrow_default_constructible_v<Policy>) {
-    std::ranges::fill(indices_, npos);
+    std::ranges::fill(index_range(), npos);
   };
 
   /**
@@ -241,10 +252,10 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
       : indices_(other.indices_), policy_(other.policy_) {}
 
   [[nodiscard]] constexpr auto cbegin() const noexcept -> const_iterator {
-    return const_iterator(std::ranges::cbegin(indices_), &probing_policy());
+    return const_iterator(std::ranges::cbegin(index_range()), &probing_policy());
   }
   [[nodiscard]] constexpr auto cend() const noexcept -> const_iterator {
-    return const_iterator(std::ranges::cend(indices_), &probing_policy());
+    return const_iterator(std::ranges::cend(index_range()), &probing_policy());
   }
 
   [[nodiscard]] constexpr auto begin() const noexcept -> const_iterator { return cbegin(); }
@@ -270,7 +281,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
       containers::resize(indices_, s, npos);
 
       // do clearing after resizing since it should not throw, ensures strong exception guarantee
-      std::ranges::fill_n(std::ranges::begin(indices_), static_cast<difference_type>(std::min(old_size, s)), npos);
+      std::ranges::fill_n(std::ranges::begin(index_range()), static_cast<difference_type>(std::min(old_size, s)), npos);
       if constexpr (has_on_clear<policy>) { policy_.get().on_clear(); }
       return true;
     } else {
@@ -308,7 +319,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   constexpr void clear()
     requires mutable_range<Container>
   {
-    std::ranges::fill(indices_, npos);
+    std::ranges::fill(index_range(), npos);
     if constexpr (has_on_clear<policy>) { policy_.get().on_clear(); }
   }
 
@@ -348,15 +359,8 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
     auto [probe_it, return_reason] = find_if(hash, predicate);
 
     if (return_reason != found::predicate) { return cend(); }
-
-    std::ranges::iterator_t<Container const> it;
-    if constexpr (std::unsigned_integral<decltype(*probe_it)>) {
-      it = std::ranges::begin(indices_) + static_cast<difference_type>(*probe_it);
-    } else {
-      it = *probe_it;
-    }
-
-    return const_iterator(it, &probing_policy());
+    auto indices = index_range();
+    return const_iterator(iterator_at(indices, probe_it), &probing_policy());
   }
 
   template <std::predicate<value_type> TPredicate>
@@ -373,18 +377,19 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   }
 
   constexpr void insert(const_iterator pos, probing_info state, value_type value) noexcept {
-    auto offset = pos - cbegin();
-    auto it = std::ranges::begin(indices_) + offset;
-    policy_.get().pre_insert(indices_, state);
+    auto indices = index_range();
+    auto it = std::ranges::begin(indices) + (pos - cbegin());
+    policy_.get().pre_insert(indices, state);
     *it = policy_.get().encode(value, state);
   }
 
   constexpr void clear_bucket(const_iterator pos) noexcept
     requires mutable_range<Container>
   {
-    std::ranges::iterator_t<Container> it = std::ranges::begin(indices_) + (pos - cbegin());
+    auto indices = index_range();
+    auto it = std::ranges::begin(indices) + (pos - cbegin());
     *it = tombstone;
-    policy_.get().post_erase(indices_, it);
+    policy_.get().post_erase(indices, it);
   }
 
   /**
@@ -438,12 +443,17 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   Container indices_;
   FLAT_HASH_NO_UNIQUE_ADDRESS maybe_empty<policy> policy_;
 
+  // decay into common ranges to reduce the number of template instantiations
+  [[nodiscard]] constexpr auto index_range() noexcept -> decltype(auto) { return containers::decay(indices_); }
+  [[nodiscard]] constexpr auto index_range() const noexcept -> decltype(auto) { return containers::decay(indices_); }
+
   [[nodiscard]] constexpr auto find_if(std::uint64_t hash, always_false_t /* unused */) const noexcept
       -> std::pair<probing_iterator, found> {
-    auto probe = policy_.get().probe(indices_, hash);
+    auto indices = index_range();
+    auto probe = policy_.get().probe(indices, hash);
 
     while (probe != probing::lookup_end{}) {
-      value_type payload = *iterator_at(indices_, probe);
+      value_type payload = *iterator_at(indices, probe);
       // predicate always returns false so there's no need to look for any values matching it
       if (payload >= tombstone) { break; }
 
@@ -457,12 +467,13 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
   [[nodiscard]] constexpr auto find_if(std::uint64_t hash, Predicate& predicate) const
       -> std::pair<probing_iterator, found> {
     // keep track of the insertion bucket in case there is no valid predicate
+    auto indices = index_range();
     std::optional<probing_iterator> insert_it = std::nullopt;
 
-    auto probe = policy_.get().probe(indices_, hash);
+    auto probe = policy_.get().probe(indices, hash);
 
     while (probe != probing::lookup_end{}) {
-      value_type payload = *iterator_at(indices_, probe);
+      value_type payload = *iterator_at(indices, probe);
 
       if (payload == npos) {
         // empty bucket, no need to continue anymore

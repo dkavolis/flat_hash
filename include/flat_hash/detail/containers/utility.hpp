@@ -23,6 +23,7 @@
 #pragma once
 
 #include <algorithm>  // for std::ranges::for_each
+#include <span>
 #include <utility>
 
 #include "../config.hpp"
@@ -274,6 +275,22 @@ constexpr void destroy_range(Alloc& allocator,
                              R&& r) noexcept(std::is_nothrow_destructible_v<std::ranges::range_value_t<R>> &&
                                              !is_allocator<Alloc>) {
   std::ranges::for_each(r, [&allocator](auto&& v) { destroy(allocator, v); });
+}
+
+template <std::ranges::range R>
+using decay_reference_t =
+    std::conditional_t<std::ranges::contiguous_range<R>,
+                       std::span<std::remove_reference_t<std::ranges::range_reference_t<R&>>>, R&>;
+template <std::ranges::range R>
+using decay_iterator_t = std::ranges::iterator_t<decay_reference_t<R>>;
+
+template <std::ranges::range R>
+[[nodiscard]] constexpr auto decay(R& r) noexcept -> decay_reference_t<R> {
+  if constexpr (std::ranges::contiguous_range<R>) {
+    return std::span(r);
+  } else {
+    return r;
+  }
 }
 
 }  // namespace detail::containers
