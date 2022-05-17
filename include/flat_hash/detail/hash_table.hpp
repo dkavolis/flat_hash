@@ -392,8 +392,7 @@ class hash_table : public containers::maybe_enable_allocator_type<Container> {
    *
    * @return Container::allocator_type
    */
-  [[nodiscard]] constexpr auto get_allocator() const noexcept(containers::nothrow_gettable_allocator<Container>)
-      -> containers::allocator_t<Container>
+  [[nodiscard]] constexpr auto get_allocator() const noexcept -> containers::allocator_t<Container>
     requires(containers::gettable_allocator<Container>)
   {
     return containers::get_allocator(indices_);

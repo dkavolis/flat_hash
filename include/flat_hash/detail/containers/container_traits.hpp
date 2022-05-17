@@ -79,14 +79,10 @@ concept traits_nothrow_capacity = requires(R const& r) {
 
 template <class R>
 concept traits_get_allocator = requires(R const& r) {
-                                 { container_traits<R>::get_allocator(r) } -> std::convertible_to<allocator_t<R>>;
+                                 {
+                                   container_traits<R>::get_allocator(r)
+                                   } noexcept -> std::convertible_to<allocator_t<R>>;
                                };
-template <class R>
-concept traits_nothrow_get_allocator = requires(R const& r) {
-                                         {
-                                           container_traits<R>::get_allocator(r)
-                                           } noexcept -> std::convertible_to<allocator_t<R>>;
-                                       };
 
 template <class R>
 concept traits_clearable = requires(R& r) { container_traits<R>::clear(r); };

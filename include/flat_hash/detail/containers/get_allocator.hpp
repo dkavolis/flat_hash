@@ -32,19 +32,13 @@ namespace detail::containers {
 template <class Container>
 concept gettable_allocator = traits_get_allocator<Container>;
 
-template <class Container>
-concept nothrow_gettable_allocator = traits_nothrow_get_allocator<Container>;
-
 template <gettable_allocator Container>
-[[nodiscard]] constexpr auto get_allocator(Container const& container) noexcept(nothrow_gettable_allocator<Container>)
-    -> allocator_t<Container> {
+[[nodiscard]] constexpr auto get_allocator(Container const& container) noexcept -> allocator_t<Container> {
   return container_traits<Container>::get_allocator(container);
 }
 
 template <class Container>
-[[nodiscard]] constexpr auto maybe_get_allocator(Container const& container
-                                                 [[maybe_unused]]) noexcept(!gettable_allocator<Container> ||
-                                                                            nothrow_gettable_allocator<Container>) {
+[[nodiscard]] constexpr auto maybe_get_allocator(Container const& container [[maybe_unused]]) noexcept {
   if constexpr (gettable_allocator<Container>) {
     return get_allocator(container);
   } else {

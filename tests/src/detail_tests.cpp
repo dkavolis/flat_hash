@@ -160,7 +160,6 @@ TEST_CASE("Generic container concepts", "[internal][concepts][containers]") {
     STATIC_REQUIRE(traits_capacity<range>);
     STATIC_REQUIRE(traits_nothrow_capacity<range>);
     STATIC_REQUIRE(traits_get_allocator<range>);
-    STATIC_REQUIRE(traits_nothrow_get_allocator<range>);
     STATIC_REQUIRE(traits_clearable<range>);
     STATIC_REQUIRE(traits_nothrow_clearable<range>);
     STATIC_REQUIRE(traits_assignable<range, std::initializer_list<int>>);
@@ -176,7 +175,6 @@ TEST_CASE("Generic container concepts", "[internal][concepts][containers]") {
     STATIC_REQUIRE(resizable<range>);
     STATIC_REQUIRE(reservable<range>);
     STATIC_REQUIRE(gettable_allocator<range>);
-    STATIC_REQUIRE(nothrow_gettable_allocator<range>);
     STATIC_REQUIRE(clearable<range>);
     STATIC_REQUIRE(back_emplaceable<range, int>);
     STATIC_REQUIRE(erasable<range>);
@@ -200,7 +198,6 @@ TEST_CASE("Generic container concepts", "[internal][concepts][containers]") {
     STATIC_REQUIRE_FALSE(traits_capacity<range>);
     STATIC_REQUIRE_FALSE(traits_nothrow_capacity<range>);
     STATIC_REQUIRE_FALSE(traits_get_allocator<range>);
-    STATIC_REQUIRE_FALSE(traits_nothrow_get_allocator<range>);
     STATIC_REQUIRE_FALSE(traits_clearable<range>);
     STATIC_REQUIRE_FALSE(traits_nothrow_clearable<range>);
     STATIC_REQUIRE_FALSE(traits_assignable<range, std::initializer_list<int>>);
@@ -216,7 +213,6 @@ TEST_CASE("Generic container concepts", "[internal][concepts][containers]") {
     STATIC_REQUIRE_FALSE(resizable<range>);
     STATIC_REQUIRE_FALSE(reservable<range>);
     STATIC_REQUIRE_FALSE(gettable_allocator<range>);
-    STATIC_REQUIRE_FALSE(nothrow_gettable_allocator<range>);
     STATIC_REQUIRE_FALSE(clearable<range>);
     STATIC_REQUIRE_FALSE(back_emplaceable<range, int>);
     STATIC_REQUIRE_FALSE(erasable<range>);
@@ -240,7 +236,6 @@ TEST_CASE("Generic container concepts", "[internal][concepts][containers]") {
     STATIC_REQUIRE_FALSE(traits_capacity<range>);
     STATIC_REQUIRE_FALSE(traits_nothrow_capacity<range>);
     STATIC_REQUIRE_FALSE(traits_get_allocator<range>);
-    STATIC_REQUIRE_FALSE(traits_nothrow_get_allocator<range>);
     STATIC_REQUIRE_FALSE(traits_clearable<range>);
     STATIC_REQUIRE_FALSE(traits_nothrow_clearable<range>);
     STATIC_REQUIRE_FALSE(traits_assignable<range, std::initializer_list<int>>);
@@ -256,7 +251,6 @@ TEST_CASE("Generic container concepts", "[internal][concepts][containers]") {
     STATIC_REQUIRE_FALSE(resizable<range>);
     STATIC_REQUIRE_FALSE(reservable<range>);
     STATIC_REQUIRE_FALSE(gettable_allocator<range>);
-    STATIC_REQUIRE_FALSE(nothrow_gettable_allocator<range>);
     STATIC_REQUIRE_FALSE(clearable<range>);
     STATIC_REQUIRE_FALSE(back_emplaceable<range, int>);
     STATIC_REQUIRE_FALSE(erasable<range>);
@@ -280,7 +274,6 @@ TEST_CASE("Generic container concepts", "[internal][concepts][containers]") {
     STATIC_REQUIRE(traits_capacity<range>);
     STATIC_REQUIRE(traits_nothrow_capacity<range>);
     STATIC_REQUIRE_FALSE(traits_get_allocator<range>);
-    STATIC_REQUIRE_FALSE(traits_nothrow_get_allocator<range>);
     STATIC_REQUIRE(traits_clearable<range>);
     STATIC_REQUIRE(traits_nothrow_clearable<range>);
     STATIC_REQUIRE_FALSE(traits_assignable<range, std::initializer_list<int>>);
@@ -296,7 +289,6 @@ TEST_CASE("Generic container concepts", "[internal][concepts][containers]") {
     STATIC_REQUIRE(resizable<range>);
     STATIC_REQUIRE_FALSE(reservable<range>);
     STATIC_REQUIRE_FALSE(gettable_allocator<range>);
-    STATIC_REQUIRE_FALSE(nothrow_gettable_allocator<range>);
     STATIC_REQUIRE(clearable<range>);
     STATIC_REQUIRE(back_emplaceable<range, int>);
     STATIC_REQUIRE(erasable<range>);
@@ -325,7 +317,7 @@ TEST_CASE("Generic container functions", "[internal][containers]") {
       }
     }
 
-    testing::test_allocators<testing::throwing::no>(v, v.get_allocator());
+    testing::test_allocators(v, v.get_allocator());
     testing::test_resize(v, "42");
     testing::test_reserve(v);
     testing::test_clear(v);
@@ -353,7 +345,7 @@ TEST_CASE("Generic container functions", "[internal][containers]") {
       }
     }
 
-    testing::test_allocators<testing::throwing::no>(v, no_allocator{});
+    testing::test_allocators(v, no_allocator{});
     testing::test_resize<false>(v, "42");
     testing::test_clear(v);
     testing::test_assign(v, strings);

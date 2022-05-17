@@ -151,8 +151,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
   constexpr ~hash_container_base() noexcept(
       hash_container_base_applied<hash_container_base, std::is_nothrow_destructible>) = default;
 
-  [[nodiscard]] constexpr auto get_allocator() const noexcept(containers::nothrow_gettable_allocator<index_container>)
-      -> containers::allocator_t<hash_table_type>
+  [[nodiscard]] constexpr auto get_allocator() const noexcept -> containers::allocator_t<hash_table_type>
     requires containers::gettable_allocator<index_container>
   {
     return table_.get_allocator();

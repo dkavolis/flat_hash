@@ -39,12 +39,7 @@ FLAT_HASH_NAMESPACE_BEGIN
 
 namespace testing {
 
-enum struct throwing {
-  yes = false,
-  no = true,
-};
-
-template <throwing nothrow = throwing::yes, std::ranges::range R, class Allocator = no_allocator>
+template <std::ranges::range R, class Allocator = no_allocator>
 void test_allocators(R const& container, Allocator const& expected_allocator = {}) {
   SECTION("allocators") {
     STATIC_REQUIRE(detail::containers::maybe_allocator<Allocator>);
@@ -53,7 +48,6 @@ void test_allocators(R const& container, Allocator const& expected_allocator = {
       STATIC_REQUIRE_FALSE(detail::containers::is_allocator<Allocator>);
       STATIC_REQUIRE(std::same_as<detail::containers::allocator_t<R>, void>);
       STATIC_REQUIRE_FALSE(detail::containers::allocator_aware<R>);
-      STATIC_REQUIRE_FALSE(detail::containers::nothrow_gettable_allocator<R>);
 
       CHECK(detail::containers::maybe_get_allocator(container) == expected_allocator);
     } else {
@@ -61,7 +55,6 @@ void test_allocators(R const& container, Allocator const& expected_allocator = {
       STATIC_REQUIRE(detail::containers::allocator_aware<R>);
       STATIC_REQUIRE(std::same_as<detail::containers::allocator_t<R>, Allocator>);
       STATIC_REQUIRE(detail::containers::gettable_allocator<R>);
-      STATIC_REQUIRE(detail::containers::nothrow_gettable_allocator<R> == (nothrow == throwing::no));
 
       CHECK(detail::containers::get_allocator(container) == expected_allocator);
       CHECK(detail::containers::maybe_get_allocator(container) == expected_allocator);

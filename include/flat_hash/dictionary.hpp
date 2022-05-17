@@ -586,17 +586,13 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    */
   constexpr ~dictionary() noexcept(detail::dict_apply<dictionary, std::is_nothrow_destructible>) = default;
 
-  [[nodiscard]] constexpr auto get_allocator() const
-      noexcept(detail::containers::nothrow_gettable_allocator<value_container>)
-          -> detail::containers::allocator_t<value_container>
+  [[nodiscard]] constexpr auto get_allocator() const noexcept -> detail::containers::allocator_t<value_container>
     requires(detail::containers::gettable_allocator<value_container>)
   {
     return detail::containers::get_allocator(values_);
   }
 
-  [[nodiscard]] constexpr auto get_allocator() const
-      noexcept(detail::containers::nothrow_gettable_allocator<key_container>)
-          -> detail::containers::allocator_t<key_container>
+  [[nodiscard]] constexpr auto get_allocator() const noexcept -> detail::containers::allocator_t<key_container>
     requires(detail::containers::gettable_allocator<key_container> &&
              !detail::containers::gettable_allocator<value_container>)
   {
@@ -607,9 +603,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    * @brief Get allocator used by the key_container.
    *
    */
-  [[nodiscard]] constexpr auto get_keys_allocator() const
-      noexcept(detail::containers::nothrow_gettable_allocator<key_container>)
-          -> detail::containers::allocator_t<key_container>
+  [[nodiscard]] constexpr auto get_keys_allocator() const noexcept -> detail::containers::allocator_t<key_container>
     requires(detail::containers::gettable_allocator<key_container>)
   {
     return detail::containers::get_allocator(keys_);
@@ -619,8 +613,7 @@ class dictionary : private detail::hash_container_base_t<Traits>,
    * @brief Get allocator used by the hash_table and index_container.
    *
    */
-  [[nodiscard]] constexpr auto get_hash_table_allocator() const
-      noexcept(detail::containers::nothrow_gettable_allocator<base>) -> detail::containers::allocator_t<base>
+  [[nodiscard]] constexpr auto get_hash_table_allocator() const noexcept -> detail::containers::allocator_t<base>
     requires(detail::containers::gettable_allocator<base>)
   {
     return base::get_allocator();

@@ -52,12 +52,8 @@ concept member_allocator_type = requires { is_allocator<typename T::allocator_ty
 
 template <class T>
 concept member_get_allocator = requires(T const& r) {
-                                 { r.get_allocator() } -> is_allocator;
+                                 { r.get_allocator() } noexcept -> is_allocator;
                                };
-template <class T>
-concept member_nothrow_get_allocator = member_get_allocator<T> && requires(T const& r) {
-                                                                    { r.get_allocator() } noexcept;
-                                                                  };
 
 // trait for inferring allocator type, either from T::allocator_type or T::get_allocator()
 

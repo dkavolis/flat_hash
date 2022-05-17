@@ -168,8 +168,7 @@ struct stl_container_traits {
    * @param container
    * @return allocator used by the container
    */
-  [[nodiscard]] constexpr static auto get_allocator(R const& container) noexcept(
-      detail::containers::member_nothrow_get_allocator<R>) -> allocator_type
+  [[nodiscard]] constexpr static auto get_allocator(R const& container) noexcept -> allocator_type
       requires(detail::containers::member_get_allocator<R>) { return container.get_allocator(); }
 
   /**
