@@ -243,7 +243,7 @@ class hash_container_base : public containers::maybe_enable_allocator_type<Conta
   constexpr void reserve_for(Keys const& keys) {
     bool resized = table_.resize_at_least(at_least<index_type>(containers::capacity(keys), max_load_factor()));
     if constexpr (mutable_range<index_container>) {
-      if (resized) { fill_hashes(keys); }
+      if (resized) { fill_hashes(containers::decay(keys)); }
     } else {
       FLAT_HASH_ASSERT(!resized, "Cannot resize immutable hash table");
     }
