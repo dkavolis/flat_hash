@@ -128,9 +128,9 @@ struct contains_pred<Dict> {
 };
 
 template <std::ranges::input_range R>
-class ContainsAnyOf : public RangeMatcher<R> {
+class ContainsAnyOfMatcher : public RangeMatcher<R> {
  public:
-  ContainsAnyOf(R r) noexcept : RangeMatcher<R>(std::forward<R>(r)) {}
+  ContainsAnyOfMatcher(R r) noexcept : RangeMatcher<R>(std::forward<R>(r)) {}
 
   template <class Hashed>
   auto match(Hashed const& s) const -> bool {
@@ -143,9 +143,9 @@ class ContainsAnyOf : public RangeMatcher<R> {
 };
 
 template <std::ranges::input_range R>
-class ContainsAllOf : public RangeMatcher<R> {
+class ContainsAllOfMatcher : public RangeMatcher<R> {
  public:
-  ContainsAllOf(R r) noexcept : RangeMatcher<R>(std::forward<R>(r)) {}
+  ContainsAllOfMatcher(R r) noexcept : RangeMatcher<R>(std::forward<R>(r)) {}
 
   template <class Hashed>
   auto match(Hashed const& s) const -> bool {
@@ -158,12 +158,12 @@ class ContainsAllOf : public RangeMatcher<R> {
 };
 
 template <std::ranges::input_range R, comparator_for<R> Comp = detail::equal_to>
-class ContainsAllOfExcept : public RangeMatcher<R> {
+class ContainsAllOfExceptMatcher : public RangeMatcher<R> {
   std::ranges::range_value_t<R> except_;
   Comp compare_;
 
  public:
-  ContainsAllOfExcept(R r, std::ranges::range_value_t<R> value, Comp compare = {}) noexcept
+  ContainsAllOfExceptMatcher(R r, std::ranges::range_value_t<R> value, Comp compare = {}) noexcept
       : RangeMatcher<R>(std::forward<R>(r)), except_(std::move(value)), compare_(compare) {}
 
   template <class Hashed>
@@ -180,9 +180,9 @@ class ContainsAllOfExcept : public RangeMatcher<R> {
 };
 
 template <std::ranges::input_range R>
-class ContainsNoneOf : public RangeMatcher<R> {
+class ContainsNoneOfMatcher : public RangeMatcher<R> {
  public:
-  ContainsNoneOf(R r) noexcept : RangeMatcher<R>(std::forward<R>(r)) {}
+  ContainsNoneOfMatcher(R r) noexcept : RangeMatcher<R>(std::forward<R>(r)) {}
 
   template <class Hashed>
   auto match(Hashed const& s) const -> bool {
@@ -194,21 +194,21 @@ class ContainsNoneOf : public RangeMatcher<R> {
 };
 
 template <class R, class Comp = detail::equal_to>
-class Equals;
+class EqualsMatcher;
 
 template <class T>
-Equals(T&&) -> Equals<T, detail::equal_to>;
+EqualsMatcher(T&&) -> EqualsMatcher<T, detail::equal_to>;
 template <class T, class Comp>
-Equals(T&&, Comp) -> Equals<T, Comp>;
+EqualsMatcher(T&&, Comp) -> EqualsMatcher<T, Comp>;
 
 template <class R, class Comp>
   requires(!std::ranges::range<R>)
-class Equals<R, Comp> : public Catch::Matchers::MatcherGenericBase {
+class EqualsMatcher<R, Comp> : public Catch::Matchers::MatcherGenericBase {
   R item_;
   Comp compare_;
 
  public:
-  Equals(R item, Comp compare = {}) noexcept : item_(std::forward<R>(item)), compare_(compare) {}
+  EqualsMatcher(R item, Comp compare = {}) noexcept : item_(std::forward<R>(item)), compare_(compare) {}
 
   template <class T>
   auto match(T const& s) const -> bool {
@@ -228,11 +228,11 @@ class Equals<R, Comp> : public Catch::Matchers::MatcherGenericBase {
 };
 
 template <std::ranges::sized_range R, comparator_for<R> Comp>
-class Equals<R, Comp> : public RangeMatcher<R> {
+class EqualsMatcher<R, Comp> : public RangeMatcher<R> {
   Comp compare_;
 
  public:
-  Equals(R r, Comp compare = {}) noexcept : RangeMatcher<R>(std::forward<R>(r)), compare_(compare) {}
+  EqualsMatcher(R r, Comp compare = {}) noexcept : RangeMatcher<R>(std::forward<R>(r)), compare_(compare) {}
 
   template <std::ranges::sized_range Range>
   auto match(Range const& s) const -> bool {
@@ -254,11 +254,11 @@ class Equals<R, Comp> : public RangeMatcher<R> {
 };
 
 template <class T>
-class Contains : public Catch::Matchers::MatcherGenericBase {
+class ContainsMatcher : public Catch::Matchers::MatcherGenericBase {
   T value_;
 
  public:
-  Contains(T value) : value_(std::forward<T>(value)) {}
+  ContainsMatcher(T value) : value_(std::forward<T>(value)) {}
 
   template <class Hashed>
   auto match(Hashed const& s) const -> bool {
@@ -270,7 +270,7 @@ class Contains : public Catch::Matchers::MatcherGenericBase {
 };
 
 template <std::ranges::sized_range R>
-class IterEquals : public Catch::Matchers::MatcherGenericBase {
+class IterEqualsMatcher : public Catch::Matchers::MatcherGenericBase {
  public:
   using iterator = typename R::const_iterator;
   using difference_type = std::ranges::range_difference_t<R>;
@@ -283,8 +283,8 @@ class IterEquals : public Catch::Matchers::MatcherGenericBase {
   mutable iterator last_{};  // match/describe have to be const, doesn't matter as matchers are not reused
 
  public:
-  IterEquals(R const& r, iterator pos) noexcept : range_(r), pos_(pos) {}
-  IterEquals(R const& r, difference_type offset) noexcept : range_(r), pos_(offset) {}
+  IterEqualsMatcher(R const& r, iterator pos) noexcept : range_(r), pos_(pos) {}
+  IterEqualsMatcher(R const& r, difference_type offset) noexcept : range_(r), pos_(offset) {}
 
   auto expected() const -> iterator {
     if (std::holds_alternative<iterator>(pos_)) { return std::get<iterator>(pos_); }
@@ -376,72 +376,75 @@ template <class V, std::convertible_to<V>... Args>
 }  // namespace testing
 
 template <std::ranges::input_range R>
-[[nodiscard]] auto ContainsAnyOf(R&& r) -> testing::ContainsAnyOf<R> {
+[[nodiscard]] auto ContainsAnyOf(R&& r) -> testing::ContainsAnyOfMatcher<R> {
   return {std::forward<R>(r)};
 }
 template <class T>
-[[nodiscard]] auto ContainsAnyOf(std::initializer_list<T> r) -> testing::ContainsAnyOf<std::initializer_list<T>> {
+[[nodiscard]] auto ContainsAnyOf(std::initializer_list<T> r)
+    -> testing::ContainsAnyOfMatcher<std::initializer_list<T>> {
   return {r};
 }
 
 template <std::ranges::input_range R>
-[[nodiscard]] auto ContainsAllOf(R&& r) -> testing::ContainsAllOf<R> {
+[[nodiscard]] auto ContainsAllOf(R&& r) -> testing::ContainsAllOfMatcher<R> {
   return {std::forward<R>(r)};
 }
 template <class T>
-[[nodiscard]] auto ContainsAllOf(std::initializer_list<T> r) -> testing::ContainsAllOf<std::initializer_list<T>> {
+[[nodiscard]] auto ContainsAllOf(std::initializer_list<T> r)
+    -> testing::ContainsAllOfMatcher<std::initializer_list<T>> {
   return {r};
 }
 
 template <std::ranges::input_range R, testing::comparator_for<R> Comp = detail::equal_to>
 [[nodiscard]] auto ContainsAllOfExcept(R&& r, std::ranges::range_value_t<R> except, Comp compare = {})
-    -> testing::ContainsAllOfExcept<R, Comp> {
+    -> testing::ContainsAllOfExceptMatcher<R, Comp> {
   return {std::forward<R>(r), std::move(except), compare};
 }
 template <class T, testing::comparator_for<std::initializer_list<T>> Comp = detail::equal_to>
 [[nodiscard]] auto ContainsAllOfExcept(std::initializer_list<T> r, T except, Comp compare = {})
-    -> testing::ContainsAllOfExcept<std::initializer_list<T>, Comp> {
+    -> testing::ContainsAllOfExceptMatcher<std::initializer_list<T>, Comp> {
   return {r, std::move(except), compare};
 }
 
 template <std::ranges::input_range R>
-[[nodiscard]] auto ContainsNoneOf(R&& r) -> testing::ContainsNoneOf<R> {
+[[nodiscard]] auto ContainsNoneOf(R&& r) -> testing::ContainsNoneOfMatcher<R> {
   return {std::forward<R>(r)};
 }
 template <class T>
-[[nodiscard]] auto ContainsNoneOf(std::initializer_list<T> r) -> testing::ContainsNoneOf<std::initializer_list<T>> {
+[[nodiscard]] auto ContainsNoneOf(std::initializer_list<T> r)
+    -> testing::ContainsNoneOfMatcher<std::initializer_list<T>> {
   return {r};
 }
 
 template <class T, detail::equality_comparator<T> Comp = detail::equal_to>
   requires(!std::ranges::input_range<T>)
-[[nodiscard]] auto Equals(T&& item, Comp compare = {}) -> testing::Equals<T, Comp> {
+[[nodiscard]] auto Equals(T&& item, Comp compare = {}) -> testing::EqualsMatcher<T, Comp> {
   return {std::forward<T>(item), compare};
 }
 
 template <std::ranges::input_range R,
           detail::equality_comparator<std::ranges::range_reference_t<R>> Comp = detail::equal_to>
-[[nodiscard]] auto Equals(R&& r, Comp compare = {}) -> testing::Equals<R, Comp> {
+[[nodiscard]] auto Equals(R&& r, Comp compare = {}) -> testing::EqualsMatcher<R, Comp> {
   return {std::forward<R>(r), compare};
 }
 template <class T, detail::equality_comparator<T> Comp = detail::equal_to>
 [[nodiscard]] auto Equals(std::initializer_list<T> r, Comp compare = {})
-    -> testing::Equals<std::initializer_list<T>, Comp> {
+    -> testing::EqualsMatcher<std::initializer_list<T>, Comp> {
   return {r, compare};
 }
 
 template <class T>
-[[nodiscard]] auto Contains(T value) -> testing::Contains<T> {
+[[nodiscard]] auto Contains(T value) -> testing::ContainsMatcher<T> {
   return {std::forward<T>(value)};
 }
 
 template <std::ranges::range R>
-[[nodiscard]] auto IterEquals(R const& r, std::ranges::iterator_t<R const&> iter) -> testing::IterEquals<R> {
+[[nodiscard]] auto IterEquals(R const& r, std::ranges::iterator_t<R const&> iter) -> testing::IterEqualsMatcher<R> {
   return {r, iter};
 }
 
 template <std::ranges::range R>
-[[nodiscard]] auto IterEquals(R const& r, std::ranges::range_difference_t<R> pos) -> testing::IterEquals<R> {
+[[nodiscard]] auto IterEquals(R const& r, std::ranges::range_difference_t<R> pos) -> testing::IterEqualsMatcher<R> {
   return {r, pos};
 }
 
