@@ -41,6 +41,7 @@ void test_hashed_constructors(std::initializer_list<typename Hashed::value_type>
                               std::initializer_list<typename Hashed::value_type> init_b,
                               std::initializer_list<typename Hashed::value_type> duplicates, Comp compare = {}) {
   // duplicates need to be equal to init_a with when duplicate values are removed
+  STATIC_REQUIRE(std::convertible_to<typename Hashed::iterator, typename Hashed::const_iterator>);
 
   if constexpr (EmptyTests) {
     SECTION("using a default constructor") {
@@ -279,7 +280,8 @@ void test_hashed_lookup(std::initializer_list<typename Hashed::value_type> init,
 
   SECTION("bucket_size returns 1 if key is in the container") {
     auto&& key = GENERATE_COPY(map(proj, from_range(init)));
-    CHECK(h.bucket_size(h.bucket(key)) == 1);
+    auto bucket = h.bucket(key);
+    CHECK(h.bucket_size(bucket) == 1);
   }
 
   SECTION("bucket_size returns 0 if key is not in the container") {
